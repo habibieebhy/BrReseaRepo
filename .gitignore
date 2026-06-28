@@ -1,0 +1,92 @@
+```gitignore
+# -------------------------
+# Python
+# -------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual Environments
+Resea/
+.venv/
+venv/
+env/
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# pytest
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+
+# Ruff
+.ruff_cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# -------------------------
+# Node / Drizzle
+# -------------------------
+node_modules/
+npm-debug.log*
+pnpm-lock.yaml
+yarn.lock
+
+# Drizzle generated files (optional)
+infra/drizzle/meta/
+
+# -------------------------
+# macOS
+# -------------------------
+.DS_Store
+
+# -------------------------
+# VS Code
+# -------------------------
+.vscode/
+
+# -------------------------
+# JetBrains
+# -------------------------
+.idea/
+
+# -------------------------
+# Docker
+# -------------------------
+docker-data/
+.colima/
+
+# -------------------------
+# Temporary Files
+# -------------------------
+*.tmp
+*.temp
+*.swp
+
+# -------------------------
+# Build
+# -------------------------
+dist/
+build/
+
+# -------------------------
+# Jupyter
+# -------------------------
+.ipynb_checkpoints/
+
+# -------------------------
+# Celery
+# -------------------------
+celerybeat-schedule
+```

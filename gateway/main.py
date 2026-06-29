@@ -4,6 +4,8 @@ from fastapi import FastAPI, HTTPException, status
 from pydantic import HttpUrl
 
 from shared.database import get_connection
+from workers.celery_app import celery
+
 
 app = FastAPI(
     title="BRIXTA Research Pipeline Gateway",
@@ -26,36 +28,55 @@ async def ingest(source_url: HttpUrl, tenant_id: str):
 
     job_id = str(uuid.uuid4())
 
-    try:
-        conn = get_connection()
+    # -------------------------
+    # Store ingestion job
+    # -------------------------
 
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO "BrResearch".ingestion_jobs
-                (
-                    id,
-                    source_type,
-                    source_target,
-                    tenant_id,
-                    status
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO "BrResearch".ingestion_jobs
+                    (
+                        id,
+                        source_type,
+                        source_target,
+                        tenant_id,
+                        status
+                    )
+                    VALUES
+                    (%s, %s, %s, %s, %s)
+                    """,
+                    (
+                        job_id,
+                        "url",
+                        str(source_url),
+                        tenant_id,
+                        "queued",
+                    ),
                 )
-                VALUES
-                (%s, %s, %s, %s, %s)
-                """,
-                (
-                    job_id,
-                    "url",
-                    str(source_url),
-                    tenant_id,
-                    "queued",
-                ),
-            )
 
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Database error: {e}",
+        )
+
+    # -------------------------
+    # Dispatch async worker
+    # -------------------------
+
+    try:
+        celery.send_task(
+            "workers.tasks.ingestion.test_ingestion",
+            args=[job_id],
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Celery dispatch failed: {e}",
         )
 
     return {

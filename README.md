@@ -55,10 +55,6 @@ A modular, event-driven research ingestion pipeline designed for scalable docume
 
 ## Project Structure
 
-```text
-## Project Structure
-
-```text
 BRIXTAresearchPipeline/
 ├── Resea/                  # Python Virtual Environment
 │
@@ -116,7 +112,7 @@ BRIXTAresearchPipeline/
 ├── .env
 ├── requirements.txt
 └── README.md
-```
+
 
 ---
 

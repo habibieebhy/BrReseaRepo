@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: gateway
-        image: docker.io/goswamirohit/brresearepo:v1
+        image: docker.io/goswamirohit/brresearepo:v2
         command: ["uvicorn", "gateway.main:app", "--host", "0.0.0.0", "--port", "8000"] # Internal container port can stay 8000 safely
         envFrom:
         - secretRef:

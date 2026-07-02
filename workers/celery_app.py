@@ -15,6 +15,7 @@ celery.conf.update(
     accept_content=["json"],
     timezone="UTC",
     enable_utc=True,
+
     imports=(
         "workers.tasks.ingestion",
         "workers.tasks.parser",
@@ -22,4 +23,22 @@ celery.conf.update(
         "workers.tasks.embeddings",
         "workers.tasks.storage",
     ),
+
+    task_routes={
+        "workers.tasks.ingestion.test_ingestion": {
+            "queue": "downloader",
+        },
+        "workers.tasks.parser.parse_document_task": {
+            "queue": "parser",
+        },
+        "workers.tasks.chunker.chunk_document_task": {
+            "queue": "chunker",
+        },
+        "workers.tasks.embeddings.generate_embeddings_task": {
+            "queue": "embeddings",
+        },
+        "workers.tasks.storage.persist_embeddings_task": {
+            "queue": "storage",
+        },
+    },
 )

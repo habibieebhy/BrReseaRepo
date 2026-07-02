@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: celery
-        image: docker.io/goswamirohit/brresearepo:v1
+        image: docker.io/goswamirohit/brresearepo:v2
         command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "chunker,downloader,parser,storage", "--loglevel=info"]
         envFrom:
         - secretRef:

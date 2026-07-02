@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
       - name: migration
-        image: docker.io/goswamirohit/brresearepo:v2
+        image: docker.io/goswamirohit/brresearepo:v1
         command: ["npx", "drizzle-kit", "push", "--config=infra/drizzle.config.ts"]
         envFrom:
         - secretRef:

@@ -16,6 +16,13 @@ spec:
       - name: gateway
         image: docker.io/goswamirohit/brresearepo:v3
         command: ["uvicorn", "gateway.main:app", "--host", "0.0.0.0", "--port", "8000"] # Internal container port can stay 8000 safely
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         envFrom:
         - secretRef:
             name: app-secrets

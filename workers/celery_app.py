@@ -1,4 +1,5 @@
 from celery import Celery
+from kombu import Queue
 
 from shared.config import REDIS_URL
 
@@ -23,6 +24,17 @@ celery.conf.update(
         "workers.tasks.embeddings",
         "workers.tasks.storage",
     ),
+
+    # Explicitly declare queues
+    task_queues=(
+        Queue("downloader"),
+        Queue("parser"),
+        Queue("chunker"),
+        Queue("embeddings"),
+        Queue("storage"),
+    ),
+
+    task_default_queue="downloader",
 
     task_routes={
         "workers.tasks.ingestion.test_ingestion": {

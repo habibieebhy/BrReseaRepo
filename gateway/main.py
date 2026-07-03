@@ -22,7 +22,6 @@ async def health():
         "service": "brixta-gateway",
     }
 
-
 @app.post("/ingest", status_code=status.HTTP_202_ACCEPTED)
 async def ingest(source_url: HttpUrl, tenant_id: str):
 
@@ -68,11 +67,20 @@ async def ingest(source_url: HttpUrl, tenant_id: str):
     # -------------------------
 
     try:
-        celery.send_task(
+        result = celery.send_task(
             "workers.tasks.ingestion.test_ingestion",
             args=[job_id],
             queue="downloader",
         )
+
+        print("=" * 60)
+        print("TASK ID:", result.id)
+        print("TASK NAME:", "workers.tasks.ingestion.test_ingestion")
+        print("QUEUE:", "downloader")
+        print("BROKER:", celery.connection().as_uri())
+        print("DEFAULT QUEUE:", celery.conf.task_default_queue)
+        print("ROUTES:", celery.conf.task_routes)
+        print("=" * 60)
 
     except Exception as e:
         raise HTTPException(

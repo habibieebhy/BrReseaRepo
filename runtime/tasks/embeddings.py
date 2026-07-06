@@ -1,20 +1,44 @@
+from brixta_sdk.context import PipelineContext
+from core.plugin_loader import PluginLoader
 from runtime.celery_app import celery
-from runtime.embeddings.service import generate_embeddings
+from runtime.jobs.repository import JobRepository
+from core.enums import JobStatus
+from runtime.utils.logging import logger
 
 
 @celery.task
-def generate_embeddings_task(job_id: str):
+def generate_embeddings_task(context_data: dict):
 
-    print(f"\n🧠 Embedding Job: {job_id}")
+    context = PipelineContext.from_dict(context_data)
 
-    embedding_file = generate_embeddings(job_id)
+    JobRepository.update_status(
+    context.job_id,
+    JobStatus.EMBEDDING,
+    )
 
-    print(f"✅ Embeddings: {embedding_file}")
+    logger.info(
+    "Embedding started | job=%s",
+    context.job_id,
+    )
+
+    logger.info(
+    "Embedding completed | job=%s artifact=%s",
+    context.job_id,
+    context.embeddings_path,
+    )
+
+    context = PluginLoader.embedding.embed(context)
+
+    logger.info(
+    "Embedding completed | job=%s artifact=%s",
+    context.job_id,
+    context.embeddings_path,
+    )
 
     celery.send_task(
-        "workers.tasks.storage.persist_embeddings_task",
-        args=[job_id],
+        "runtime.tasks.storage.persist_embeddings_task",
+        args=[context.to_dict()],
         queue="storage",
     )
 
-    return str(embedding_file)
+    return str(context.embeddings_path)

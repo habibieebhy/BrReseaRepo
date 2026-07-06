@@ -1,20 +1,44 @@
+from brixta_sdk.context import PipelineContext
+from core.plugin_loader import PluginLoader
 from runtime.celery_app import celery
-from runtime.parser.service import parse_document
+from runtime.jobs.repository import JobRepository
+from core.enums import JobStatus
+from runtime.utils.logging import logger
 
 
 @celery.task
-def parse_document_task(job_id: str):
+def parse_document_task(context_data: dict):
 
-    print(f"\n📄 Parsing Job: {job_id}")
+    context = PipelineContext.from_dict(context_data)
 
-    markdown_path = parse_document(job_id)
+    JobRepository.update_status(
+    context.job_id,
+    JobStatus.PARSING,
+    )
 
-    print(f"✅ Markdown: {markdown_path}")
+    logger.info(
+    "Parser started | job=%s",
+    context.job_id,
+    )
+
+    logger.info(
+    "Parser completed | job=%s artifact=%s",
+    context.job_id,
+    context.parsed_path,
+    )
+
+    context = PluginLoader.parser.parse(context)
+
+    logger.info(
+    "Parser completed | job=%s artifact=%s",
+    context.job_id,
+    context.parsed_path,
+    )
 
     celery.send_task(
-        "workers.tasks.chunker.chunk_document_task",
-        args=[job_id],
+        "runtime.tasks.chunker.chunk_document_task",
+        args=[context.to_dict()],
         queue="chunker",
     )
 
-    return str(markdown_path)
+    return str(context.parsed_path)

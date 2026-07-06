@@ -18,14 +18,13 @@ celery.conf.update(
     enable_utc=True,
 
     imports=(
-        "workers.tasks.ingestion",
-        "workers.tasks.parser",
-        "workers.tasks.chunker",
-        "workers.tasks.embeddings",
-        "workers.tasks.storage",
+        "runtime.tasks.ingestion",
+        "runtime.tasks.parser",
+        "runtime.tasks.chunker",
+        "runtime.tasks.embeddings",
+        "runtime.tasks.storage",
     ),
 
-    # Explicitly declare queues
     task_queues=(
         Queue("downloader"),
         Queue("parser"),
@@ -37,19 +36,19 @@ celery.conf.update(
     task_default_queue="downloader",
 
     task_routes={
-        "workers.tasks.ingestion.test_ingestion": {
+        "runtime.tasks.ingestion.test_ingestion": {
             "queue": "downloader",
         },
-        "workers.tasks.parser.parse_document_task": {
+        "runtime.tasks.parser.parse_document_task": {
             "queue": "parser",
         },
-        "workers.tasks.chunker.chunk_document_task": {
+        "runtime.tasks.chunker.chunk_document_task": {
             "queue": "chunker",
         },
-        "workers.tasks.embeddings.generate_embeddings_task": {
+        "runtime.tasks.embeddings.generate_embeddings_task": {
             "queue": "embeddings",
         },
-        "workers.tasks.storage.persist_embeddings_task": {
+        "runtime.tasks.storage.persist_embeddings_task": {
             "queue": "storage",
         },
     },

@@ -435,13 +435,13 @@ docker ps
 ### Start FastAPI Gateway
 
 ```bash
-uvicorn gateway.main:app --reload
+uvicorn api.main:app --reload
 ```
 
 ### Start Celery Worker (macOS Development)
 
 ```bash
-celery -A workers.celery_app.celery worker \
+celery -A runtime.celery_app.celery worker \
     --pool=solo \
     --loglevel=info
 ```

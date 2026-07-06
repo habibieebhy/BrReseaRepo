@@ -11,6 +11,9 @@ class NomicEmbeddingPlugin(EmbeddingPlugin):
         context: PipelineContext,
     ) -> PipelineContext:
 
+        if context.embeddings_path and context.embeddings_path.exists():
+            return context
+
         context.embeddings_path = generate_embeddings(context.job_id)
 
         return context

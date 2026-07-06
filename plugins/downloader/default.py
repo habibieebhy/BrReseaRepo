@@ -11,6 +11,9 @@ class DefaultDownloaderPlugin(DownloaderPlugin):
         context: PipelineContext,
     ) -> PipelineContext:
 
+        if context.raw_path and context.raw_path.exists():
+            return context
+
         context.raw_path = download_document(context.job_id)
 
         return context

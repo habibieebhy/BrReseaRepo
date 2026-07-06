@@ -1,20 +1,38 @@
+from brixta_sdk.context import PipelineContext
+from core.plugin_loader import PluginLoader
 from runtime.celery_app import celery
-from runtime.chunker.service import chunk_document
+from runtime.jobs.repository import JobRepository
+from core.enums import JobStatus
+from runtime.utils.logging import logger
 
 
 @celery.task
-def chunk_document_task(job_id: str):
+def chunk_document_task(context_data: dict):
 
-    print(f"\n🧩 Chunking Job: {job_id}")
+    context = PipelineContext.from_dict(context_data)
 
-    chunk_file = chunk_document(job_id)
-
-    print(f"✅ Chunks: {chunk_file}")
-
-    celery.send_task(
-    "workers.tasks.embeddings.generate_embeddings_task",
-    args=[job_id],
-    queue="embeddings",
+    JobRepository.update_status(
+       context.job_id,
+       JobStatus.CHUNKING,
     )
 
-    return str(chunk_file)
+    context = PluginLoader.chunker.chunk(context)
+
+    logger.info(
+    "Chunker started | job=%s",
+    context.job_id,
+    )
+
+    logger.info(
+    "Chunker completed | job=%s artifact=%s",
+    context.job_id,
+    context.chunks_path,
+    )
+
+    celery.send_task(
+        "runtime.tasks.embeddings.generate_embeddings_task",
+        args=[context.to_dict()],
+        queue="embeddings",
+    )
+
+    return str(context.chunks_path)

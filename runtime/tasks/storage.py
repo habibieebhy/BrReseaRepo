@@ -1,12 +1,36 @@
+from brixta_sdk.context import PipelineContext
+from core.plugin_loader import PluginLoader
 from runtime.celery_app import celery
-from runtime.storage.service import persist_embeddings
+from runtime.jobs.repository import JobRepository
+from core.enums import JobStatus
+from runtime.utils.logging import logger
 
 
 @celery.task
-def persist_embeddings_task(job_id: str):
+def persist_embeddings_task(context_data: dict):
 
-    print(f"\n💾 Persisting Job: {job_id}")
+    context = PipelineContext.from_dict(context_data)
 
-    persist_embeddings(job_id)
+    JobRepository.update_status(
+    context.job_id,
+    JobStatus.COMPLETED,
+    )
 
-    print("✅ Stored in pgvector")
+    logger.info(
+    "Storage started | job=%s",
+    context.job_id,
+    )
+
+    logger.info(
+    "Storage completed | job=%s",
+    context.job_id,
+    )
+
+    context = PluginLoader.storage.persist(context)
+
+    logger.info(
+    "Storage completed | job=%s",
+    context.job_id,
+    )
+
+    return context.job_id

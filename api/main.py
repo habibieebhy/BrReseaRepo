@@ -3,12 +3,12 @@ import uuid
 from fastapi import FastAPI, HTTPException, status
 from pydantic import HttpUrl
 
-from core.database import get_connection
+from brixta_sdk.context import PipelineContext
 from runtime.celery_app import celery
 
 
 app = FastAPI(
-    title="BRIXTA Research Pipeline Gateway",
+    title="BRIXTA Core API",
     description="High-performance ingestion entry point.",
     version="2.0.0",
 )
@@ -19,67 +19,42 @@ async def health():
     return {
         "status": "healthy",
         "database": "Neon PostgreSQL",
-        "service": "brixta-gateway",
+        "service": "brixta-core",
     }
 
+
 @app.post("/ingest", status_code=status.HTTP_202_ACCEPTED)
-async def ingest(source_url: HttpUrl, tenant_id: str):
+async def ingest(
+    source_url: HttpUrl,
+    tenant_id: str,
+):
 
-    job_id = str(uuid.uuid4())
+    # ----------------------------------------------------
+    # Build Pipeline Context
+    # ----------------------------------------------------
 
-    # -------------------------
-    # Store ingestion job
-    # -------------------------
+    context = PipelineContext(
+        job_id=str(uuid.uuid4()),
+        tenant_id=tenant_id,
+        source_type="url",
+        source_target=str(source_url),
+    )
 
-    try:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO "BrResearch".ingestion_jobs
-                    (
-                        id,
-                        source_type,
-                        source_target,
-                        tenant_id,
-                        status
-                    )
-                    VALUES
-                    (%s, %s, %s, %s, %s)
-                    """,
-                    (
-                        job_id,
-                        "url",
-                        str(source_url),
-                        tenant_id,
-                        "queued",
-                    ),
-                )
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Database error: {e}",
-        )
-
-    # -------------------------
-    # Dispatch downloader worker
-    # -------------------------
+    # ----------------------------------------------------
+    # Dispatch Runtime
+    # ----------------------------------------------------
 
     try:
         result = celery.send_task(
-            "workers.tasks.ingestion.test_ingestion",
-            args=[job_id],
+            "runtime.tasks.ingestion.test_ingestion",
+            args=[context.to_dict()],
             queue="downloader",
         )
 
         print("=" * 60)
         print("TASK ID:", result.id)
-        print("TASK NAME:", "workers.tasks.ingestion.test_ingestion")
+        print("TASK:", "runtime.tasks.ingestion.test_ingestion")
         print("QUEUE:", "downloader")
-        print("BROKER:", celery.connection().as_uri())
-        print("DEFAULT QUEUE:", celery.conf.task_default_queue)
-        print("ROUTES:", celery.conf.task_routes)
         print("=" * 60)
 
     except Exception as e:
@@ -89,8 +64,8 @@ async def ingest(source_url: HttpUrl, tenant_id: str):
         )
 
     return {
-        "message": "Ingestion task queued successfully.",
-        "job_id": job_id,
-        "tenant_id": tenant_id,
+        "message": "Pipeline queued successfully.",
+        "job_id": context.job_id,
+        "tenant_id": context.tenant_id,
         "status": "queued",
     }

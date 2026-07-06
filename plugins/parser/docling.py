@@ -11,6 +11,9 @@ class DoclingParserPlugin(ParserPlugin):
         context: PipelineContext,
     ) -> PipelineContext:
 
+        if context.parsed_path and context.parsed_path.exists():
+            return context
+
         context.parsed_path = parse_document(context.job_id)
 
         return context

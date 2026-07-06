@@ -16,7 +16,7 @@ spec:
       containers:
       - name: celery-embeddings
         image: docker.io/goswamirohit/brresearepo:v3
-        command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "embeddings", "--loglevel=info"]
+        command: ["celery", "-A", "runtime.celery_app", "worker", "-Q", "embeddings", "--loglevel=info"]
         envFrom:
         - secretRef:
             name: app-secrets

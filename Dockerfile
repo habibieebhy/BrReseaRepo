@@ -51,10 +51,15 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy the application code AND the infra directory
-COPY gateway/ ./gateway/
-COPY shared/ ./shared/
-COPY workers/ ./workers/
+COPY api/ ./api/
+COPY core/ ./core/
+COPY plugins/ ./plugins/
+COPY runtime/ ./runtime/
+COPY brixta_sdk/ ./brixta_sdk/
 COPY infra/ ./infra/
+
+# Install drizzle deps inside infra folder
+RUN cd infra && npm install
 
 # Create empty storage directories with correct permissions
 COPY --chown=appuser:appuser storage/ ./storage/
@@ -66,4 +71,4 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 # Default command
-CMD ["uvicorn", "gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

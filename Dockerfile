@@ -59,7 +59,7 @@ COPY brixta_sdk/ ./brixta_sdk/
 COPY infra/ ./infra/
 
 # Install drizzle deps inside infra folder
-#RUN cd infra && npm install
+RUN cd infra && npm install
 
 # Create empty storage directories with correct permissions
 COPY --chown=appuser:appuser storage/ ./storage/

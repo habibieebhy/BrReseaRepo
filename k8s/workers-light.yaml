@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: celery
-        image: docker.io/goswamirohit/brresearepo:v3
+        image: docker.io/goswamirohit/brresearepo:v4
         command: ["celery", "-A", "runtime.celery_app.celery", "worker", "--loglevel=info", "-Q", "light_tasks"]
         envFrom:
         - secretRef:

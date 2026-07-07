@@ -29,6 +29,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy dependencies file (Assuming requirements.txt exists at root)
 # If using pyproject.toml/poetry, adjust installation command here
 COPY requirements.txt .
+ARG CACHE_DATE=1
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 

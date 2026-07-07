@@ -67,3 +67,41 @@ class ArtifactBackend(ABC):
 
     @abstractmethod
     def embeddings_exists(self, job_id: str) -> bool: ...
+
+
+    # -------------------------
+    # Backend
+    # -------------------------
+
+    @abstractmethod
+    def provider(self) -> str:
+        """
+        Returns the backend provider name.
+
+        Examples:
+            local
+            minio
+            s3
+            r2
+        """
+        ...
+
+    @abstractmethod
+    def health(self) -> bool:
+        """
+        Returns whether the backend is healthy.
+        """
+        ...
+
+    @abstractmethod
+    def info(self) -> dict:
+        """
+        Returns backend-specific information.
+
+        Example:
+        {
+            "bucket": "brixta",
+            "endpoint": "localhost:9000"
+        }
+        """
+        ...

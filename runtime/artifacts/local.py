@@ -101,3 +101,16 @@ class LocalFilesystemBackend(ArtifactBackend):
 
     def embeddings_exists(self, job_id: str) -> bool:
         return self._path("embeddings", f"{job_id}.json").exists()
+    
+    def provider(self) -> str:
+        return "local"
+
+
+    def health(self) -> bool:
+        return self.ROOT.exists()
+
+
+    def info(self) -> dict:
+        return {
+            "root": str(self.ROOT.resolve()),
+        }

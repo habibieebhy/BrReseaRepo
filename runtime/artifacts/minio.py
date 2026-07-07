@@ -268,3 +268,19 @@ class MinIOBackend(ArtifactBackend):
 
         except S3Error:
             return False
+    def provider(self) -> str:
+        return "minio"
+
+
+    def health(self) -> bool:
+        try:
+            return self.client.bucket_exists(self.bucket)
+        except Exception:
+            return False
+
+
+    def info(self) -> dict:
+        return {
+            "endpoint": "localhost:9000",
+            "bucket": self.bucket,
+        }

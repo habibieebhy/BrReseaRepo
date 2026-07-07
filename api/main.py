@@ -5,6 +5,7 @@ from pydantic import HttpUrl
 
 from brixta_sdk.context import PipelineContext
 from runtime.celery_app import celery
+from api.prod_api.router import router as prod_router
 
 
 app = FastAPI(
@@ -12,7 +13,11 @@ app = FastAPI(
     description="High-performance ingestion entry point.",
     version="2.0.0",
 )
-
+app.include_router(
+    prod_router,
+    prefix="/prod",
+    tags=["Production"],
+)
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health():

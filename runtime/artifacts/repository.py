@@ -90,3 +90,14 @@ class ArtifactRepository:
     @classmethod
     def embeddings_exists(cls, job_id: str) -> bool:
         return cls.backend.embeddings_exists(job_id)
+    @classmethod
+    def provider(cls) -> str:
+        return cls.backend.provider()
+    @classmethod
+    def health(cls) -> bool:
+        return cls.backend.health()
+
+
+    @classmethod
+    def info(cls) -> dict:
+        return cls.backend.info()

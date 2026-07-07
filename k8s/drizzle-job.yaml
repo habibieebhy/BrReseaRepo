@@ -7,8 +7,9 @@ spec:
     spec:
       containers:
       - name: migration
-        image: docker.io/goswamirohit/brresearepo:v3
-        command: ["npx", "drizzle-kit", "push", "--config=infra/drizzle.config.ts"]
+        image: docker.io/goswamirohit/brresearepo:v4
+        workingDir: /app/infra
+        command: ["/bin/sh", "-c", "npm install && npx drizzle-kit push --config=drizzle.config.ts"]        
         envFrom:
         - secretRef:
             name: app-secrets

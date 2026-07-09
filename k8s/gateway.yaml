@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: gateway
-        image: docker.io/goswamirohit/brresearepo:v4
+        image: docker.io/goswamirohit/brresearepo:v5
         #command: ["sleep", "3600"]
         command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"] # Internal container port can stay 8000 safely
         resources:

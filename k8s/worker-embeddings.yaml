@@ -15,8 +15,8 @@ spec:
       terminationGracePeriodSeconds: 300
       containers:
       - name: celery-embeddings
-        image: docker.io/goswamirohit/brresearepo:v4
-        command: ["celery", "-A", "runtime.celery_app.celery", "worker", "--loglevel=info", "-Q", "embedding_tasks"]
+        image: docker.io/goswamirohit/brresearepo:v5
+        command: ["celery", "-A", "runtime.celery_app.celery", "worker", "--loglevel=info", "-Q", "embeddings,storage"]
         envFrom:
         - secretRef:
             name: app-secrets

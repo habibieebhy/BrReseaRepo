@@ -43,6 +43,11 @@ kubectl apply -f k8s/redis.yaml
 kubectl wait --for=condition=ready pod -l app=redis --timeout=60s
 echo "Redis is online!"
 
+echo "Starting MinIO..."
+kubectl apply -f k8s/minio.yaml
+kubectl wait --for=condition=ready pod -l app=minio --timeout=120s
+echo "MinIO is online"
+
 # 6. Run Database Migrations
 echo "Running Drizzle Database Migrations..."
 # Delete the old job if it exists so we can run a fresh one

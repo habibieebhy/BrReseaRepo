@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
       - name: migration
-        image: docker.io/goswamirohit/brresearepo:v4
+        image: docker.io/goswamirohit/brresearepo:v5
         workingDir: /app/infra
         command: ["/bin/sh", "-c", "npm install && npx drizzle-kit push --config=drizzle.config.ts"]        
         envFrom:

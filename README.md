@@ -378,6 +378,7 @@ Start the scheduler in another terminal when using cron sources:
 
 ```bash
 python -m celery -A runtime.celery_app.celery beat --loglevel=info
+
 ```
 
 ### 8. Start the dashboard

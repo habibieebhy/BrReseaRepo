@@ -12,6 +12,7 @@ from core.exceptions import ValidationError
 from core.plugin_loader import PLUGIN_STAGES, registry
 from api.sources import router as sources_router
 from runtime.settings import RuntimeSettingsRepository
+from runtime.jobs.repository import JobRepository
 
 
 class IngestionRequest(BaseModel):
@@ -76,12 +77,15 @@ async def ingest(
     # Dispatch Runtime
     # ----------------------------------------------------
 
+    JobRepository.create(context)
+
     try:
         result = celery.send_task(
             "runtime.tasks.ingestion.test_ingestion",
             args=[context.to_dict()],
             queue="downloader",
         )
+        JobRepository.mark_dispatched(context.job_id, result.id, "downloader")
 
         print("=" * 60)
         print("TASK ID:", result.id)
@@ -90,6 +94,11 @@ async def ingest(
         print("=" * 60)
 
     except Exception as e:
+        JobRepository.record_failure(
+            context.job_id,
+            f"Celery dispatch failed: {e}",
+            retryable=True,
+        )
         raise HTTPException(
             status_code=500,
             detail=f"Celery dispatch failed: {e}",
@@ -152,9 +161,16 @@ async def ingest_file(
         config={"embedding_model": embedding_model},
         metadata={"filename": file.filename, "size_bytes": size},
     )
+    JobRepository.create(context)
     try:
-        celery.send_task("runtime.tasks.ingestion.test_ingestion", args=[context.to_dict()], queue="downloader")
+        result = celery.send_task("runtime.tasks.ingestion.test_ingestion", args=[context.to_dict()], queue="downloader")
+        JobRepository.mark_dispatched(context.job_id, result.id, "downloader")
     except Exception as exc:
+        JobRepository.record_failure(
+            context.job_id,
+            f"Celery dispatch failed: {exc}",
+            retryable=True,
+        )
         raise HTTPException(status_code=503, detail=f"Could not queue file ingestion: {exc}") from exc
     return {"message": "File pipeline queued successfully.", "job_id": job_id, "tenant_id": tenant_id, "status": "queued", "plugins": selection, "filename": file.filename}
 

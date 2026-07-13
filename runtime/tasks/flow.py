@@ -1,6 +1,7 @@
 from brixta_sdk.context import PipelineContext
 from core.plugin_loader import PLUGIN_STAGES
 from runtime.celery_app import celery
+from runtime.jobs.repository import JobRepository
 
 
 TASKS = {
@@ -25,5 +26,6 @@ def dispatch_next(context: PipelineContext, current_stage: str) -> str | None:
         return None
     next_stage = order[index + 1]
     task_name, queue = TASKS[next_stage]
-    celery.send_task(task_name, args=[context.to_dict()], queue=queue)
+    result = celery.send_task(task_name, args=[context.to_dict()], queue=queue)
+    JobRepository.mark_dispatched(context.job_id, result.id, next_stage)
     return next_stage

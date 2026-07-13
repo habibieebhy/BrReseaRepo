@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 # ---------------------------------------------------------------------
 # Storage
@@ -91,6 +91,7 @@ from api.prod_api.docker import (
     logs,
 )
 from runtime.jobs.repository import JobRepository
+from runtime.jobs.service import JobRetryError, retry_failed_job
 
 router = APIRouter()
 
@@ -101,6 +102,16 @@ def ingestion_jobs(limit: int = 100, tenant_id: str | None = None):
         return {"jobs": JobRepository.list(limit=min(max(limit, 1), 500), tenant_id=tenant_id)}
     except Exception as exc:
         return {"jobs": [], "error": str(exc)}
+
+
+@router.post("/jobs/{job_id}/retry")
+def retry_ingestion_job(job_id: str):
+    try:
+        return retry_failed_job(job_id)
+    except JobRetryError as exc:
+        message = str(exc)
+        status_code = 404 if message == "Job not found." else 409
+        raise HTTPException(status_code=status_code, detail=message) from exc
 
 from api.prod_api.plugins import (
     embedding_plugins,

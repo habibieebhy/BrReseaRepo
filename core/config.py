@@ -41,6 +41,21 @@ LOG_LEVEL = os.getenv(
     "INFO",
 )
 
+# ---------------------------------------------------------------------
+# Job recovery
+# ---------------------------------------------------------------------
+
+MAX_TASK_ATTEMPTS = max(1, int(os.getenv("MAX_TASK_ATTEMPTS", "3")))
+TASK_RETRY_BACKOFF_SECONDS = max(
+    1,
+    int(os.getenv("TASK_RETRY_BACKOFF_SECONDS", "15")),
+)
+ORPHAN_TIMEOUT_SECONDS = max(
+    60,
+    int(os.getenv("ORPHAN_TIMEOUT_SECONDS", "1800")),
+)
+MAX_JOB_RUNS = max(1, int(os.getenv("MAX_JOB_RUNS", "3")))
+
 #----------------------------------------------------------------------
 #Artifact
 #----------------------------------------------------------------------

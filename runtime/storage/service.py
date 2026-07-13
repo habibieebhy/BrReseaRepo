@@ -63,6 +63,13 @@ def persist_embeddings(job_id: str) -> None:
                         %s,
                         %s
                     )
+                    ON CONFLICT (job_id, chunk_index)
+                    DO UPDATE SET
+                        tenant_id = EXCLUDED.tenant_id,
+                        content = EXCLUDED.content,
+                        embedding_model = EXCLUDED.embedding_model,
+                        embedding_dimension = EXCLUDED.embedding_dimension,
+                        embedding = EXCLUDED.embedding
                     """,
                     (
                         job_id,

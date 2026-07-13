@@ -5,6 +5,10 @@ import {
   bigserial,
   integer,
   customType,
+  timestamp,
+  boolean,
+  jsonb,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // -----------------------------------------------------------------------------
@@ -43,6 +47,36 @@ export const ingestionJobs = brixtaSchema.table("ingestion_jobs", {
     .notNull(),
 
   errorLog: text("error_log"),
+
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+
+  startedAt: timestamp("started_at", { withTimezone: true }),
+
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+
+  currentStage: text("current_stage"),
+
+  celeryTaskId: text("celery_task_id"),
+
+  attemptCount: integer("attempt_count").default(0).notNull(),
+
+  maxAttempts: integer("max_attempts").default(3).notNull(),
+
+  terminal: boolean("terminal").default(false).notNull(),
+
+  retryable: boolean("retryable").default(true).notNull(),
+
+  retryCount: integer("retry_count").default(0).notNull(),
+
+  parentJobId: uuid("parent_job_id"),
+
+  contextJson: jsonb("context_json"),
 });
 
 // -----------------------------------------------------------------------------
@@ -72,4 +106,6 @@ export const documentChunks = brixtaSchema.table("document_chunks", {
   embeddingDimension: integer("embedding_dimension").notNull(),
 
   embedding: vector("embedding").notNull(),
-});
+}, (table) => [
+  uniqueIndex("document_chunks_job_chunk_idx").on(table.jobId, table.chunkIndex),
+]);

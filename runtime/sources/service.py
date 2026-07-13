@@ -8,6 +8,7 @@ from core.plugin_loader import registry
 from runtime.celery_app import celery
 from runtime.sources.repository import SourceRepository
 from runtime.settings import RuntimeSettingsRepository
+from runtime.jobs.repository import JobRepository
 
 
 def enqueue_source(source: dict) -> dict:
@@ -20,11 +21,21 @@ def enqueue_source(source: dict) -> dict:
         config={"pipeline_order": RuntimeSettingsRepository.get().get("pipeline_order", ["downloader", "parser", "chunker", "embedding", "storage"]), **source.get("config", {})},
         metadata={"source_id": source["id"], "crawl_strategy": source["crawl_strategy"]},
     )
-    result = celery.send_task(
-        "runtime.tasks.ingestion.test_ingestion",
-        args=[context.to_dict()],
-        queue="downloader",
-    )
+    JobRepository.create(context)
+    try:
+        result = celery.send_task(
+            "runtime.tasks.ingestion.test_ingestion",
+            args=[context.to_dict()],
+            queue="downloader",
+        )
+        JobRepository.mark_dispatched(context.job_id, result.id, "downloader")
+    except Exception as exc:
+        JobRepository.record_failure(
+            context.job_id,
+            f"Celery dispatch failed: {exc}",
+            retryable=True,
+        )
+        raise
     SourceRepository.update(
         source["id"],
         {

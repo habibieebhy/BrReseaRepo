@@ -90,3 +90,13 @@ class SourceRepository:
                 return False
             cls._write(remaining)
             return True
+
+    @classmethod
+    def update_by_job(cls, job_id: str, changes: dict[str, Any]) -> dict[str, Any] | None:
+        source = next(
+            (item for item in cls._read() if item.get("last_job_id") == job_id),
+            None,
+        )
+        if source is None:
+            return None
+        return cls.update(source["id"], changes)

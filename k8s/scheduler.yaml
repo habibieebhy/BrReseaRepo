@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brixta-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: brixta-scheduler
+  template:
+    metadata:
+      labels:
+        app: brixta-scheduler
+    spec:
+      containers:
+        - name: celery-beat
+          image: docker.io/goswamirohit/brresearepo:v5
+          command: ["celery", "-A", "runtime.celery_app.celery", "beat", "--loglevel=info"]
+          envFrom:
+            - secretRef:
+                name: app-secrets
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /app/storage
+      volumes:
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: storage-pvc

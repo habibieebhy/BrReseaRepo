@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+from typing import Any
 from .context import PipelineContext
 
 
@@ -8,18 +9,11 @@ class EmbeddingPlugin(ABC):
     version: str
 
     @abstractmethod
-    def models(self) -> list[str]:
-        """
-        Returns all supported embedding models.
-        """
-        ...
-
-
-    @abstractmethod
     def embed(
         self,
         context: PipelineContext,
         model: str,
+        profile: dict[str, Any],
     ) -> PipelineContext:
         """
         Generate embeddings using the selected model.

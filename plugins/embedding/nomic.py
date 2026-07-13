@@ -1,12 +1,29 @@
 import json
 from pathlib import Path
+from functools import lru_cache
 
 from sentence_transformers import SentenceTransformer
 
 from brixta_sdk.context import PipelineContext
+from typing import Any
 from brixta_sdk.embedding import EmbeddingPlugin
 
 from runtime.artifacts.repository import ArtifactRepository
+
+
+@lru_cache(maxsize=2)
+def load_embedding_model(model: str, trust_remote_code: bool, revision: str | None) -> SentenceTransformer:
+    """Load and cache approved embedding models inside each worker process.
+
+    Trust and revision are supplied by the registry's approved model profile,
+    never inferred from an arbitrary user-supplied model name.
+    """
+    return SentenceTransformer(
+        model,
+        trust_remote_code=trust_remote_code,
+        revision=revision,
+        device="cpu",
+    )
 
 
 class SentenceTransformersEmbeddingPlugin(EmbeddingPlugin):
@@ -14,22 +31,11 @@ class SentenceTransformersEmbeddingPlugin(EmbeddingPlugin):
     name = "Sentence Transformers"
     version = "1.0.0"
 
-    def models(self) -> list[str]:
-        """
-        Returns all supported Sentence Transformers models.
-        """
-
-        return [
-            "nomic-ai/nomic-embed-text-v1.5",
-            "BAAI/bge-large-en-v1.5",
-            "jinaai/jina-embeddings-v3",
-            "intfloat/e5-large-v2",
-        ]
-
     def embed(
         self,
         context: PipelineContext,
         model: str,
+        profile: dict[str, Any],
     ) -> PipelineContext:
 
         if context.embeddings_path and context.embeddings_path.exists():
@@ -44,22 +50,34 @@ class SentenceTransformersEmbeddingPlugin(EmbeddingPlugin):
             ArtifactRepository.load_chunks(context.job_id)
         )
 
-        embedding_model = SentenceTransformer(model)
+        embedding_model = load_embedding_model(
+            model,
+            bool(profile["trust_remote_code"]),
+            profile.get("revision"),
+        )
 
         embedded_chunks = []
 
         for chunk in chunks:
 
             vector = embedding_model.encode(
-                f"search_document: {chunk['text']}",
-                normalize_embeddings=True,
+                f"{profile.get('document_prefix', '')}{chunk['text']}",
+                normalize_embeddings=bool(profile.get("normalize", True)),
             ).tolist()
+
+            if len(vector) != int(profile["dimensions"]):
+                raise ValueError(
+                    f"Model '{model}' returned {len(vector)} dimensions; "
+                    f"its approved profile declares {profile['dimensions']}."
+                )
 
             embedded_chunks.append(
                 {
                     "chunk_id": chunk["chunk_id"],
                     "text": chunk["text"],
                     "embedding": vector,
+                    "embedding_model": model,
+                    "embedding_dimension": len(vector),
                 }
             )
 

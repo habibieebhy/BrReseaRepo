@@ -1,8 +1,8 @@
-from pathlib import Path
 from io import BytesIO
 from minio.error import S3Error
 from minio import Minio
 from runtime.artifacts.backend import ArtifactBackend
+from core.config import MINIO_ACCESS_KEY, MINIO_BUCKET, MINIO_ENDPOINT, MINIO_SECRET_KEY, MINIO_SECURE
 
 
 class MinIOBackend(ArtifactBackend):
@@ -10,14 +10,14 @@ class MinIOBackend(ArtifactBackend):
     def __init__(self):
 
         self.client = Minio(
-            "localhost:9000",
-            access_key="minioadmin",
-            secret_key="minioadmin",
-            secure=False,
+            MINIO_ENDPOINT,
+            access_key=MINIO_ACCESS_KEY,
+            secret_key=MINIO_SECRET_KEY,
+            secure=MINIO_SECURE,
         )
+        self.bucket = MINIO_BUCKET
 
-        self.bucket = "brixta"
-
+    def _ensure_bucket(self) -> None:
         if not self.client.bucket_exists(self.bucket):
             self.client.make_bucket(self.bucket)
 
@@ -26,6 +26,7 @@ class MinIOBackend(ArtifactBackend):
         job_id: str,
         data: str,
         ) -> None:
+        self._ensure_bucket()
         object_name = f"raw/{job_id}.html"
         payload = data.encode("utf-8")
         self.client.put_object(
@@ -95,6 +96,7 @@ class MinIOBackend(ArtifactBackend):
         data: str,
     ) -> None:
 
+        self._ensure_bucket()
         object_name = f"markdown/{job_id}.md"
 
         payload = data.encode("utf-8")
@@ -149,6 +151,7 @@ class MinIOBackend(ArtifactBackend):
         data: str,
     ) -> None:
 
+        self._ensure_bucket()
         object_name = f"chunks/{job_id}.json"
 
         payload = data.encode("utf-8")
@@ -204,6 +207,7 @@ class MinIOBackend(ArtifactBackend):
         data: str,
     ) -> None:
 
+        self._ensure_bucket()
         object_name = f"embeddings/{job_id}.json"
 
         payload = data.encode("utf-8")
@@ -221,6 +225,7 @@ class MinIOBackend(ArtifactBackend):
         data: str,
     ) -> None:
 
+        self._ensure_bucket()
         object_name = f"docling/{job_id}.json"
 
         payload = data.encode("utf-8")
@@ -281,6 +286,16 @@ class MinIOBackend(ArtifactBackend):
 
     def info(self) -> dict:
         return {
-            "endpoint": "localhost:9000",
+            "endpoint": MINIO_ENDPOINT,
             "bucket": self.bucket,
         }
+
+    def objects(self, prefix: str = "", limit: int = 200) -> list[dict]:
+        if not self.client.bucket_exists(self.bucket):
+            return []
+        result = []
+        for item in self.client.list_objects(self.bucket, prefix=prefix, recursive=True):
+            result.append({"name": item.object_name, "size": item.size, "last_modified": item.last_modified.isoformat() if item.last_modified else None})
+            if len(result) >= limit:
+                break
+        return result

@@ -1,6 +1,7 @@
 from api.prod_api.kubernetes import cluster_health
 from api.prod_api.queues import broker_health
 from api.prod_api.storage import provider as storage_provider
+from core.database import get_connection
 
 
 def runtime() -> dict:
@@ -18,14 +19,17 @@ def database() -> dict:
     """
     Returns Database health.
 
-    TODO:
-    Replace with a real PostgreSQL health check.
+    Executes a lightweight query against the configured PostgreSQL database.
     """
 
-    return {
-        "provider": "postgresql",
-        "healthy": True,
-    }
+    try:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+        return {"provider": "postgresql", "healthy": True}
+    except Exception as exc:
+        return {"provider": "postgresql", "healthy": False, "error": str(exc)}
 
 
 def redis() -> dict:

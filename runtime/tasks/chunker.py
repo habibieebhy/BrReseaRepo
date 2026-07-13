@@ -4,6 +4,7 @@ from runtime.celery_app import celery
 from runtime.jobs.repository import JobRepository
 from core.enums import JobStatus
 from runtime.utils.logging import logger
+from runtime.tasks.flow import dispatch_next
 
 
 @celery.task
@@ -16,7 +17,7 @@ def chunk_document_task(context_data: dict):
        JobStatus.CHUNKING,
     )
 
-    context = PluginLoader.chunker.chunk(context)
+    context = PluginLoader.get("chunker", context.plugins).chunk(context)
 
     logger.info(
     "Chunker started | job=%s",
@@ -29,10 +30,6 @@ def chunk_document_task(context_data: dict):
     context.chunks_path,
     )
 
-    celery.send_task(
-        "runtime.tasks.embeddings.generate_embeddings_task",
-        args=[context.to_dict()],
-        queue="embeddings",
-    )
+    dispatch_next(context, "chunker")
 
     return str(context.chunks_path)

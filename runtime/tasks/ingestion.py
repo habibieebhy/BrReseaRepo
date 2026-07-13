@@ -4,6 +4,7 @@ from core.plugin_loader import PluginLoader
 from runtime.celery_app import celery
 from runtime.jobs.repository import JobRepository
 from runtime.utils.logging import logger
+from runtime.tasks.flow import dispatch_next
 
 
 @celery.task(
@@ -29,7 +30,8 @@ def test_ingestion(context_data: dict):
     context.job_id,
     )
 
-    context = PluginLoader.downloader.download(context)
+    context.plugins = PluginLoader.resolve(context.plugins)
+    context = PluginLoader.get("downloader", context.plugins).download(context)
 
     logger.info(
     "Downloader completed | job=%s artifact=%s",
@@ -37,10 +39,6 @@ def test_ingestion(context_data: dict):
     context.raw_path,
     )
 
-    celery.send_task(
-        "runtime.tasks.parser.parse_document_task",
-        args=[context.to_dict()],
-        queue="parser",
-    )
+    dispatch_next(context, "downloader")
 
     return str(context.raw_path)

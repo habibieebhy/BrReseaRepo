@@ -1,77 +1,17 @@
-// app/(dashboard)/docker/page.tsx
+"use client";
 
-import React from "react";
-import { fetchPythonApi } from "@/lib/api";
-import Link from "next/link";
+import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { requestPythonApi } from "@/lib/api";
 
-export default async function DockerPage() {
-  const [infoData, containersData] = await Promise.all([
-    fetchPythonApi("/prod/docker", { cache: "no-store" }),
-    fetchPythonApi("/prod/docker/containers", { cache: "no-store" }),
-  ]);
-
-  // Safely extract the container list whether the API returns a direct array 
-  // or an object with a 'containers' key.
-  const containerList = Array.isArray(containersData) 
-    ? containersData 
-    : containersData?.containers || [];
-
-  return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold tracking-tight">Docker Host</h1>
-      <p className="text-muted-foreground">Local container engine status and running instances.</p>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Engine Info */}
-        <div className="p-4 border rounded-xl shadow-sm bg-card flex flex-col">
-          <h2 className="text-lg font-semibold mb-2">Engine Info</h2>
-          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto text-muted-foreground grow max-h-96">
-            {JSON.stringify(infoData, null, 2)}
-          </pre>
-        </div>
-
-        {/* Interactive Containers List */}
-        <div className="p-4 border rounded-xl shadow-sm bg-card flex flex-col">
-          <div className="flex justify-between items-center mb-4">
-             <h2 className="text-lg font-semibold">Running Containers</h2>
-             <span className="text-xs text-muted-foreground">Select to view logs & controls</span>
-          </div>
-          
-          <div className="flex flex-col gap-3 grow max-h-96 overflow-auto pr-2">
-            {containerList.length === 0 ? (
-              <div className="text-sm text-muted-foreground p-4 text-center border rounded-md">
-                No containers found or failed to parse data.
-              </div>
-            ) : (
-              containerList.map((container: any, idx: number) => {
-                // Assuming your Python API returns at least a 'name' field for the container
-                // Adjust 'container.name' to 'container.Id' or whatever key your API provides if needed.
-                const name = container.name || container.Names?.[0]?.replace('/', '') || `container-${idx}`;
-                const status = container.state || container.Status || "Unknown";
-
-                return (
-                  <div 
-                    key={idx} 
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-semibold">{name}</span>
-                      <span className="text-xs text-muted-foreground">Status: {status}</span>
-                    </div>
-                    
-                    <Link href={`/docker/${name}`}>
-                      <Button variant="secondary" size="sm">
-                        Manage →
-                      </Button>
-                    </Link>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+interface Container { id: string; name: string; image: string; status: string }
+export default function DockerPage() {
+  const [health, setHealth] = useState<{ healthy?: boolean; error?: string }>({}); const [containers, setContainers] = useState<Container[]>([]); const [logs, setLogs] = useState<{ name: string; body: string } | null>(null); const [busy, setBusy] = useState<string | null>(null);
+  const load = () => Promise.all([requestPythonApi<{ healthy: boolean; error?: string }>("/prod/docker"), requestPythonApi<{ containers: Container[] }>("/prod/docker/containers")]).then(([h, c]) => { setHealth(h); setContainers(c.containers); }).catch((reason: Error) => setHealth({ healthy: false, error: reason.message }));
+  useEffect(() => { void load(); }, []);
+  async function restart(name: string) { setBusy(name); try { await requestPythonApi(`/prod/docker/restart/${name}`, { method: "POST" }); await load(); } finally { setBusy(null); } }
+  async function showLogs(name: string) { setBusy(name); try { const value = await requestPythonApi<{ logs: string }>(`/prod/docker/logs/${name}`); setLogs({ name, body: value.logs }); } catch (reason) { setLogs({ name, body: reason instanceof Error ? reason.message : "Logs unavailable" }); } finally { setBusy(null); } }
+  return <div className="mx-auto max-w-7xl space-y-6 p-6"><div><h1 className="text-3xl font-bold tracking-tight">Docker</h1><p className="text-muted-foreground">Local container state, logs, and manual restart controls.</p></div>{!health.healthy && <div className="border border-destructive/30 bg-destructive/10 p-4"><p className="font-medium text-destructive">Docker engine unavailable</p><p className="text-xs text-muted-foreground">{health.error || "Start Docker Desktop and make its socket available to BRIXTA Core."}</p></div>}<Card><CardHeader><CardTitle>Containers</CardTitle><CardDescription>{containers.length} container(s) discovered, including stopped containers.</CardDescription></CardHeader><CardContent className="space-y-2">{containers.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 border p-3"><div><div className="flex items-center gap-2"><p className="font-medium">{item.name}</p><Badge variant={item.status === "running" ? "default" : "secondary"}>{item.status}</Badge></div><p className="text-xs text-muted-foreground">{item.image}</p></div><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => showLogs(item.name)}>Logs</Button><Button size="sm" onClick={() => restart(item.name)} disabled={busy === item.name}>Restart</Button></div></div>)}{containers.length === 0 && <p className="text-muted-foreground">No containers discovered.</p>}</CardContent></Card>{logs && <Card><CardHeader><CardTitle>{logs.name}</CardTitle><CardDescription>Latest container output</CardDescription></CardHeader><CardContent><pre className="max-h-96 overflow-auto bg-muted p-4 text-xs whitespace-pre-wrap">{logs.body}</pre></CardContent></Card>}</div>;
 }

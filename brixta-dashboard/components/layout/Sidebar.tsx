@@ -6,16 +6,14 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Upload,
-  Briefcase,
   Puzzle,
   Database,
-  Activity,
   Settings,
   Container,
   Boxes,
   Flower2,
   Server,
-  HardDrive,
+  Globe2,
   Store,
   BookOpen,
 } from "lucide-react";
@@ -33,6 +31,11 @@ const sections = [
         name: "Ingestion",
         href: "/ingestion",
         icon: Upload,
+      },
+      {
+        name: "Sources & Schedules",
+        href: "/sources",
+        icon: Globe2,
       },
       {
         name: "Plugins",

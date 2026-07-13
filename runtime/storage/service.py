@@ -49,10 +49,14 @@ def persist_embeddings(job_id: str) -> None:
                         tenant_id,
                         chunk_index,
                         content,
+                        embedding_model,
+                        embedding_dimension,
                         embedding
                     )
                     VALUES
                     (
+                        %s,
+                        %s,
                         %s,
                         %s,
                         %s,
@@ -65,6 +69,8 @@ def persist_embeddings(job_id: str) -> None:
                         tenant_id,
                         chunk["chunk_id"],
                         chunk["text"],
+                        chunk["embedding_model"],
+                        chunk["embedding_dimension"],
                         chunk["embedding"],
                     ),
                 )

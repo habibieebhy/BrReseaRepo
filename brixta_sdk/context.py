@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PipelineContext(BaseModel):
@@ -38,13 +38,16 @@ class PipelineContext(BaseModel):
     # Metadata
     # --------------------------------------------------
 
-    metadata: dict[str, Any] = {}
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     # --------------------------------------------------
     # Runtime Configuration
     # --------------------------------------------------
 
-    config: dict[str, Any] = {}
+    config: dict[str, Any] = Field(default_factory=dict)
+
+    # Plugin IDs selected for this job. Missing stages use registry defaults.
+    plugins: dict[str, str] = Field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """

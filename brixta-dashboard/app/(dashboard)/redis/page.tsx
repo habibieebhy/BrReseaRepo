@@ -1,65 +1,13 @@
-// app/(dashboard)/redis/page.tsx
-
-import React from "react";
-import { fetchPythonApi } from "@/lib/api";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { fetchPythonApi } from "@/lib/api";
 
+interface Queue { name: string; pending: number }
+interface Container { name: string; image: string; status: string }
 export default async function RedisPage() {
-  const [infoData, queuesData, containersData] = await Promise.all([
-    fetchPythonApi("/prod/redis", { cache: "no-store" }),
-    fetchPythonApi("/prod/redis/queues", { cache: "no-store" }),
-    fetchPythonApi("/prod/docker/containers", { cache: "no-store" }), // Fetch Docker data
-  ]);
-
-  // Safely parse containers and find the one related to Redis
-  const containerList = Array.isArray(containersData) ? containersData : containersData?.containers || [];
-  const redisContainer = containerList.find((c: any) => 
-    (c.name || c.Names?.[0] || "").toLowerCase().includes("redis") ||
-    (c.image || c.Image || "").toLowerCase().includes("redis")
-  );
-
-  return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Redis Cache & Broker</h1>
-          <p className="text-muted-foreground">Live broker diagnostics and Celery queue statuses.</p>
-        </div>
-        
-        {/* If we found the container, give a quick link to manage it */}
-        {redisContainer && (
-          <Link href={`/dashboard/docker/${redisContainer.name || redisContainer.Names?.[0]?.replace('/', '')}`}>
-            <Button variant="outline">View Container Logs</Button>
-          </Link>
-        )}
-      </div>
-
-      {/* Docker Status Banner */}
-      <div className={`p-4 border rounded-xl shadow-sm flex items-center justify-between ${redisContainer ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
-        <div>
-          <h2 className="font-semibold">{redisContainer ? "Container is Running" : "Container Not Found!"}</h2>
-          <p className="text-sm text-muted-foreground">
-            {redisContainer ? `ID: ${redisContainer.id || redisContainer.Id?.substring(0,12)} | Status: ${redisContainer.state || redisContainer.Status}` : "Ensure your docker-compose or container is running with 'redis' in the name."}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="p-4 border rounded-xl shadow-sm bg-card flex flex-col">
-          <h2 className="text-lg font-semibold mb-2">Broker Info</h2>
-          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto text-muted-foreground grow max-h-96">
-            {JSON.stringify(infoData, null, 2)}
-          </pre>
-        </div>
-
-        <div className="p-4 border rounded-xl shadow-sm bg-card flex flex-col">
-          <h2 className="text-lg font-semibold mb-2">Active Queues</h2>
-          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto text-muted-foreground grow max-h-96">
-            {JSON.stringify(queuesData, null, 2)}
-          </pre>
-        </div>
-      </div>
-    </div>
-  );
+  const [health, queues, docker] = await Promise.all([fetchPythonApi("/prod/redis", { cache: "no-store" }), fetchPythonApi("/prod/redis/queues", { cache: "no-store" }), fetchPythonApi("/prod/docker/containers", { cache: "no-store" })]) as [{ healthy?: boolean; error?: string }, { queues?: Queue[] }, { containers?: Container[] }];
+  const container = (docker.containers || []).find((item) => item.name.toLowerCase().includes("redis") || item.image.toLowerCase().includes("redis"));
+  return <div className="mx-auto max-w-7xl space-y-6 p-6"><div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-3xl font-bold tracking-tight">Redis</h1><p className="text-muted-foreground">Broker connectivity and pending Celery messages.</p></div>{container && <Button variant="outline" render={<Link href={`/docker/${container.name}`} />}>Manage container</Button>}</div><div className={`border p-4 ${health.healthy ? "border-primary/20 bg-primary/5" : "border-destructive/30 bg-destructive/10"}`}><div className="flex items-center gap-2"><p className="font-medium">Redis broker</p><Badge variant={health.healthy ? "default" : "destructive"}>{health.healthy ? "connected" : "unavailable"}</Badge></div>{health.error && <p className="mt-2 text-xs text-muted-foreground">{health.error}</p>}</div><Card><CardHeader><CardTitle>Queues</CardTitle><CardDescription>{queues.queues?.length || 0} Redis list queue(s) detected</CardDescription></CardHeader><CardContent className="space-y-2">{(queues.queues || []).map((queue) => <div key={queue.name} className="flex items-center justify-between border p-3"><span className="font-medium">{queue.name}</span><Badge variant={queue.pending ? "secondary" : "outline"}>{queue.pending} pending</Badge></div>)}{!queues.queues?.length && <p className="text-muted-foreground">No queues visible. Start Redis and a Celery worker to populate routing queues.</p>}</CardContent></Card></div>;
 }

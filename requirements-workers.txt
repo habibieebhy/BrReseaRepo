@@ -1,0 +1,6 @@
+-r requirements-api.txt
+
+# Install only on parser/embedding workers. These packages are intentionally
+# separated from the API environment because they are large and platform-sensitive.
+docling>=2,<3
+sentence-transformers>=3,<6

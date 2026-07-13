@@ -1,4 +1,3 @@
-```gitignore
 # -------------------------
 # Python
 # -------------------------
@@ -79,6 +78,8 @@ docker-data/
 # -------------------------
 dist/
 build/
+.next/
+storage/control-plane/runtime.env
 
 # -------------------------
 # Jupyter
@@ -89,4 +90,3 @@ build/
 # Celery
 # -------------------------
 celerybeat-schedule
-```

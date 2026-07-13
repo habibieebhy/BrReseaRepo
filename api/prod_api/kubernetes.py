@@ -8,6 +8,7 @@ from kubernetes.client import (
     V1PodList,
 )
 from kubernetes.config import ConfigException
+from datetime import datetime, timezone
 
 
 def load_config() -> None:
@@ -108,3 +109,17 @@ def list_deployments() -> dict:
             for deployment in (deployments.items or [])
         ]
     }
+
+
+def pod_logs(namespace: str, name: str, tail: int = 200) -> dict:
+    load_config()
+    logs = api().read_namespaced_pod_log(name=name, namespace=namespace, tail_lines=tail, timestamps=True)
+    return {"namespace": namespace, "pod": name, "logs": logs}
+
+
+def restart_deployment(namespace: str, name: str) -> dict:
+    load_config()
+    restarted_at = datetime.now(timezone.utc).isoformat()
+    body = {"spec": {"template": {"metadata": {"annotations": {"brixta.io/restartedAt": restarted_at}}}}}
+    apps().patch_namespaced_deployment(name=name, namespace=namespace, body=body)
+    return {"namespace": namespace, "deployment": name, "status": "restart_requested", "restarted_at": restarted_at}

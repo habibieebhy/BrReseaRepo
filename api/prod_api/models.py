@@ -46,7 +46,6 @@ class Worker(BaseModel):
     name: str
     status: str
     active_tasks: int
-    status: str
 
 
 class Task(BaseModel):

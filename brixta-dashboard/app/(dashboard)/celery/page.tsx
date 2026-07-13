@@ -1,76 +1,12 @@
-// app/(dashboard)/jobs/page.tsx
-
-import React from "react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchPythonApi } from "@/lib/api";
 
-export default async function JobsPage() {
-  // Fetch all Celery and task data in parallel
-  const [
-    infoData,
-    workersData,
-    activeData,
-    reservedData,
-    scheduledData,
-    statsData,
-  ] = await Promise.all([
-    fetchPythonApi("/prod/celery", { cache: "no-store" }),
-    fetchPythonApi("/prod/celery/workers", { cache: "no-store" }),
-    fetchPythonApi("/prod/celery/tasks/active", { cache: "no-store" }),
-    fetchPythonApi("/prod/celery/tasks/reserved", { cache: "no-store" }),
-    fetchPythonApi("/prod/celery/tasks/scheduled", { cache: "no-store" }),
-    fetchPythonApi("/prod/celery/stats", { cache: "no-store" }),
-  ]);
-
-  return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold tracking-tight">Background Jobs</h1>
-      <p className="text-muted-foreground">
-        Live Celery worker status and vectorization task queues.
-      </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="p-4 border rounded-xl shadow-sm bg-card flex flex-col">
-          <h2 className="text-lg font-semibold mb-2">Celery Health</h2>
-          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto text-muted-foreground grow max-h-96">
-            {JSON.stringify(infoData, null, 2)}
-          </pre>
-        </div>
-
-        <div className="p-4 border rounded-xl shadow-sm bg-card flex flex-col">
-          <h2 className="text-lg font-semibold mb-2">Workers</h2>
-          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto text-muted-foreground grow max-h-96">
-            {JSON.stringify(workersData, null, 2)}
-          </pre>
-        </div>
-
-        <div className="p-4 border rounded-xl shadow-sm bg-card flex flex-col">
-          <h2 className="text-lg font-semibold mb-2">Active Tasks</h2>
-          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto text-muted-foreground grow max-h-96">
-            {JSON.stringify(activeData, null, 2)}
-          </pre>
-        </div>
-
-        <div className="p-4 border rounded-xl shadow-sm bg-card flex flex-col">
-          <h2 className="text-lg font-semibold mb-2">Reserved Tasks</h2>
-          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto text-muted-foreground grow max-h-96">
-            {JSON.stringify(reservedData, null, 2)}
-          </pre>
-        </div>
-
-        <div className="p-4 border rounded-xl shadow-sm bg-card flex flex-col">
-          <h2 className="text-lg font-semibold mb-2">Scheduled Tasks</h2>
-          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto text-muted-foreground grow max-h-96">
-            {JSON.stringify(scheduledData, null, 2)}
-          </pre>
-        </div>
-
-        <div className="p-4 border rounded-xl shadow-sm bg-card flex flex-col">
-          <h2 className="text-lg font-semibold mb-2">Global Stats</h2>
-          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto text-muted-foreground grow max-h-96">
-            {JSON.stringify(statsData, null, 2)}
-          </pre>
-        </div>
-      </div>
-    </div>
-  );
+interface Worker { name: string; status: string; active_tasks: number }
+interface Task { id: string; name: string; worker: string; state: string }
+interface Job { id: string; source_type: string; source_target: string; tenant_id: string; status: string; error?: string }
+export default async function CeleryPage() {
+  const [health, workers, active, reserved, scheduled, jobs] = await Promise.all([fetchPythonApi("/prod/celery", { cache: "no-store" }), fetchPythonApi("/prod/celery/workers", { cache: "no-store" }), fetchPythonApi("/prod/celery/tasks/active", { cache: "no-store" }), fetchPythonApi("/prod/celery/tasks/reserved", { cache: "no-store" }), fetchPythonApi("/prod/celery/tasks/scheduled", { cache: "no-store" }), fetchPythonApi("/prod/jobs", { cache: "no-store" })]) as [{ healthy?: boolean; error?: string }, { workers?: Worker[] }, { tasks?: Task[] }, { tasks?: Task[] }, { tasks?: Task[] }, { jobs?: Job[]; error?: string }];
+  const groups = [{ name: "Active", tasks: active.tasks || [] }, { name: "Reserved", tasks: reserved.tasks || [] }, { name: "Scheduled", tasks: scheduled.tasks || [] }];
+  return <div className="mx-auto max-w-7xl space-y-6 p-6"><div><h1 className="text-3xl font-bold tracking-tight">Celery jobs</h1><p className="text-muted-foreground">Live worker execution plus durable ingestion state from PostgreSQL.</p></div>{!health.healthy && <div className="border border-destructive/30 bg-destructive/10 p-4"><p className="font-medium text-destructive">No Celery worker responded</p><p className="text-xs text-muted-foreground">{health.error || "Start a worker and ensure Redis is reachable."}</p></div>}<Card><CardHeader><CardTitle>Workers</CardTitle><CardDescription>{workers.workers?.length || 0} online worker(s)</CardDescription></CardHeader><CardContent className="space-y-2">{(workers.workers || []).map((worker) => <div key={worker.name} className="flex items-center justify-between border p-3"><div><p className="font-medium">{worker.name}</p><p className="text-xs text-muted-foreground">{worker.active_tasks} active task(s)</p></div><Badge>{worker.status}</Badge></div>)}</CardContent></Card><Card><CardHeader><CardTitle>Pipeline history</CardTitle><CardDescription>{jobs.error || `${jobs.jobs?.length || 0} persisted job(s)`}</CardDescription></CardHeader><CardContent className="space-y-2">{(jobs.jobs || []).map((job) => <div key={job.id} className="grid gap-2 border p-3 md:grid-cols-[1fr_auto]"><div><p className="break-all font-medium">{job.source_target}</p><p className="text-xs text-muted-foreground">{job.tenant_id} · {job.source_type} · {job.id}</p>{job.error && <p className="mt-1 text-xs text-destructive">{job.error}</p>}</div><Badge variant={job.status === "completed" ? "default" : job.status === "failed" ? "destructive" : "secondary"}>{job.status}</Badge></div>)}</CardContent></Card><div className="grid gap-4 lg:grid-cols-3">{groups.map((group) => <Card key={group.name}><CardHeader><CardTitle>{group.name}</CardTitle><CardDescription>{group.tasks.length} task(s)</CardDescription></CardHeader><CardContent className="space-y-2">{group.tasks.map((task) => <div key={task.id} className="border p-3"><p className="break-all font-medium">{task.name}</p><p className="text-xs text-muted-foreground">{task.worker} · {task.state}</p></div>)}{group.tasks.length === 0 && <p className="text-muted-foreground">Nothing {group.name.toLowerCase()}.</p>}</CardContent></Card>)}</div></div>;
 }

@@ -4,6 +4,7 @@ from runtime.celery_app import celery
 from runtime.jobs.repository import JobRepository
 from core.enums import JobStatus
 from runtime.utils.logging import logger
+from runtime.tasks.flow import dispatch_next
 
 
 @celery.task
@@ -21,7 +22,7 @@ def parse_document_task(context_data: dict):
     context.job_id,
     )
 
-    context = PluginLoader.parser.parse(context)
+    context = PluginLoader.get("parser", context.plugins).parse(context)
 
     logger.info(
     "Parser completed | job=%s artifact=%s",
@@ -29,10 +30,6 @@ def parse_document_task(context_data: dict):
     context.parsed_path,
     )
 
-    celery.send_task(
-        "runtime.tasks.chunker.chunk_document_task",
-        args=[context.to_dict()],
-        queue="chunker",
-    )
+    dispatch_next(context, "parser")
 
     return str(context.parsed_path)

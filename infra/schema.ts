@@ -15,12 +15,13 @@ export const brixtaSchema = pgSchema("BrResearch");
 
 // -----------------------------------------------------------------------------
 // pgvector
-// Nomic Embed v1.5 -> 768 dimensions
+// Model dimensions are recorded per row so pipelines may select different
+// approved embedding models. Similarity queries must filter by model/dimension.
 // -----------------------------------------------------------------------------
 
 const vector = customType<{ data: number[] }>({
   dataType() {
-    return "vector(768)";
+    return "vector";
   },
 });
 
@@ -65,6 +66,10 @@ export const documentChunks = brixtaSchema.table("document_chunks", {
   chunkIndex: integer("chunk_index").notNull(),
 
   content: text("content").notNull(),
+
+  embeddingModel: text("embedding_model").notNull(),
+
+  embeddingDimension: integer("embedding_dimension").notNull(),
 
   embedding: vector("embedding").notNull(),
 });

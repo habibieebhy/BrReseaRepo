@@ -1,52 +1,15 @@
-// app/(dashboard)/storage/page.tsx
+"use client";
 
-import React from "react";
-import { fetchPythonApi } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { requestPythonApi } from "@/lib/api";
 
-export default async function StoragePage() {
-  // Fetch data in parallel to prevent waterfall requests
-  const [
-    providerData, 
-    healthData, 
-    statsData
-  ] = await Promise.all([
-    fetchPythonApi("/prod/storage", {cache: "no-store"}),
-    fetchPythonApi("/prod/storage/health", {cache: "no-store"}),
-    fetchPythonApi("/prod/storage/statistics", {cache: "no-store"}),
-  ]);
-
-  return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold tracking-tight">Storage Overview</h1>
-      <p className="text-muted-foreground">
-        Live data fetched directly from Python backend.
-      </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Provider Block */}
-        <div className="p-4 border rounded-xl shadow-sm bg-card">
-          <h2 className="text-lg font-semibold mb-2">Provider</h2>
-          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto text-muted-foreground">
-            {JSON.stringify(providerData, null, 2)}
-          </pre>
-        </div>
-
-        {/* Health Block */}
-        <div className="p-4 border rounded-xl shadow-sm bg-card">
-          <h2 className="text-lg font-semibold mb-2">System Health</h2>
-          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto text-muted-foreground">
-            {JSON.stringify(healthData, null, 2)}
-          </pre>
-        </div>
-
-        {/* Statistics Block */}
-        <div className="p-4 border rounded-xl shadow-sm bg-card">
-          <h2 className="text-lg font-semibold mb-2">Artifact Statistics</h2>
-          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto text-muted-foreground">
-            {JSON.stringify(statsData, null, 2)}
-          </pre>
-        </div>
-      </div>
-    </div>
-  );
+interface StorageInfo { provider: string; healthy: boolean; endpoint?: string; bucket?: string }
+interface ObjectInfo { name: string; size: number; last_modified?: string }
+export default function StoragePage() {
+  const [info, setInfo] = useState<StorageInfo | null>(null); const [objects, setObjects] = useState<ObjectInfo[]>([]); const [consoleUrl, setConsoleUrl] = useState("http://localhost:9001"); const [message, setMessage] = useState<string | null>(null);
+  useEffect(() => { Promise.all([requestPythonApi<StorageInfo>("/prod/storage"), requestPythonApi<{ objects: ObjectInfo[]; console_url?: string; message?: string; error?: string }>("/prod/storage/objects")]).then(([storage, listing]) => { setInfo(storage); setObjects(listing.objects || []); setConsoleUrl(listing.console_url || "http://localhost:9001"); setMessage(listing.error || listing.message || null); }).catch((reason: Error) => setMessage(reason.message)); }, []);
+  return <div className="mx-auto max-w-7xl space-y-6 p-6"><div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-3xl font-bold tracking-tight">Artifact storage</h1><p className="text-muted-foreground">Raw documents, parsed artifacts, chunks, and generated embeddings.</p></div>{info?.provider === "minio" && <Button render={<a href={consoleUrl} target="_blank" rel="noreferrer" />}>Open MinIO Console</Button>}</div><div className="grid gap-4 md:grid-cols-3"><Card><CardHeader><CardTitle>Provider</CardTitle><CardDescription>Active artifact backend</CardDescription></CardHeader><CardContent><div className="flex items-center gap-2"><span className="font-medium">{info?.provider || "unknown"}</span><Badge variant={info?.healthy ? "default" : "destructive"}>{info?.healthy ? "running" : "unavailable"}</Badge></div></CardContent></Card><Card><CardHeader><CardTitle>Endpoint</CardTitle><CardDescription>Configured service target</CardDescription></CardHeader><CardContent><p>{info?.endpoint || "Local filesystem"}</p></CardContent></Card><Card><CardHeader><CardTitle>Bucket</CardTitle><CardDescription>MinIO object namespace</CardDescription></CardHeader><CardContent><p>{info?.bucket || "Not applicable"}</p></CardContent></Card></div><Card><CardHeader><CardTitle>Objects</CardTitle><CardDescription>{objects.length} object(s) visible in the active MinIO bucket.</CardDescription></CardHeader><CardContent>{message && <p className="mb-3 text-xs text-muted-foreground">{message}</p>}<div className="space-y-2">{objects.map((item) => <div key={item.name} className="grid gap-2 border p-3 text-xs sm:grid-cols-[1fr_auto_auto]"><span className="break-all font-medium">{item.name}</span><span>{item.size.toLocaleString()} bytes</span><span className="text-muted-foreground">{item.last_modified ? new Date(item.last_modified).toLocaleString() : ""}</span></div>)}{objects.length === 0 && <p className="text-muted-foreground">No MinIO objects available. Select MinIO as the artifact backend and start the container to browse objects here.</p>}</div></CardContent></Card><Card><CardHeader><CardTitle>MinIO login</CardTitle><CardDescription>Credentials remain outside the dashboard.</CardDescription></CardHeader><CardContent className="space-y-2 text-sm"><p>Default local console: <code>{consoleUrl}</code></p><p>With your development command, the username is <code>minioadmin</code>. The dashboard never reads or displays the password. Change both credentials before exposing MinIO beyond localhost.</p></CardContent></Card></div>;
 }

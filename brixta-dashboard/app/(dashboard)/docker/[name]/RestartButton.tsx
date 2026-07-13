@@ -30,9 +30,9 @@ export function RestartButton({ containerName }: { containerName: string }) {
         window.location.reload();
       }, 2000);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      setMessage(error.message || "An error occurred.");
+      setMessage(error instanceof Error ? error.message : "An error occurred.");
     } finally {
       setIsRestarting(false);
     }

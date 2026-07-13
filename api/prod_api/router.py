@@ -9,6 +9,7 @@ from api.prod_api.storage import (
     storage_health,
     artifact_statistics,
     artifacts,
+    objects,
 )
 
 # ---------------------------------------------------------------------
@@ -20,6 +21,9 @@ from api.prod_api.settings import (
     infrastructure,
     environment,
     configuration,
+    desired,
+    save_desired,
+    DesiredRuntimeSettings,
 )
 
 # ---------------------------------------------------------------------
@@ -51,6 +55,8 @@ from api.prod_api.kubernetes import (
     cluster_health,
     list_pods,
     list_deployments,
+    pod_logs,
+    restart_deployment,
 )
 
 # ---------------------------------------------------------------------
@@ -84,8 +90,17 @@ from api.prod_api.docker import (
     restart,
     logs,
 )
+from runtime.jobs.repository import JobRepository
 
 router = APIRouter()
+
+
+@router.get("/jobs")
+def ingestion_jobs(limit: int = 100, tenant_id: str | None = None):
+    try:
+        return {"jobs": JobRepository.list(limit=min(max(limit, 1), 500), tenant_id=tenant_id)}
+    except Exception as exc:
+        return {"jobs": [], "error": str(exc)}
 
 from api.prod_api.plugins import (
     embedding_plugins,
@@ -123,6 +138,11 @@ def storage_artifacts(job_id: str):
     return artifacts(job_id)
 
 
+@router.get("/storage/objects")
+def storage_objects(prefix: str = ""):
+    return objects(prefix)
+
+
 # =====================================================================
 # Runtime Settings
 # =====================================================================
@@ -145,6 +165,16 @@ def environment_settings():
 @router.get("/settings")
 def settings():
     return configuration()
+
+
+@router.get("/settings/control-plane")
+def control_plane_settings():
+    return desired()
+
+
+@router.put("/settings/control-plane")
+def update_control_plane_settings(payload: DesiredRuntimeSettings):
+    return save_desired(payload)
 
 
 # =====================================================================
@@ -207,6 +237,16 @@ def kubernetes_pods():
 @router.get("/kubernetes/deployments")
 def kubernetes_deployments():
     return list_deployments()
+
+
+@router.get("/kubernetes/pods/{namespace}/{name}/logs")
+def kubernetes_pod_logs(namespace: str, name: str, tail: int = 200):
+    return pod_logs(namespace, name, tail)
+
+
+@router.post("/kubernetes/deployments/{namespace}/{name}/restart")
+def kubernetes_restart_deployment(namespace: str, name: str):
+    return restart_deployment(namespace, name)
 
 
 # =====================================================================

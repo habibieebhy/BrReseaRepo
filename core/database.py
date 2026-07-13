@@ -9,6 +9,9 @@ def get_connection():
     Returns a PostgreSQL connection with pgvector support enabled.
     """
 
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is required for database operations.")
+
     try:
         conn = psycopg.connect(
             DATABASE_URL,

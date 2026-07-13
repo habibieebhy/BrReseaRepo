@@ -32,9 +32,7 @@ COPY requirements-api.txt .
 COPY requirements-workers.txt .
 ARG CACHE_DATE=1
 RUN pip install --upgrade pip && \
-    pip install -r requirements.txt \
-    pip install -r requirements-api.txt \
-    pip install -r requirements-workers.txt
+    pip install -r requirements.txt -r requirements-api.txt -r requirements-workers.txt
 
 # ==========================================
 # Stage 3: Production Runner

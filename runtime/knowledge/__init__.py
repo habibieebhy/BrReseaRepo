@@ -7,6 +7,7 @@ from runtime.knowledge.service import (
     list_knowledge_bases,
     search_knowledge_base,
 )
+from runtime.knowledge.access import KnowledgeAccessRepository
 
 __all__ = [
     "KnowledgeBaseError",
@@ -14,4 +15,5 @@ __all__ = [
     "fetch_chunk",
     "list_knowledge_bases",
     "search_knowledge_base",
+    "KnowledgeAccessRepository",
 ]

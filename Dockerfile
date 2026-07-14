@@ -26,13 +26,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy dependencies file
-COPY requirements.txt .
+# Install maintained dependency groups. requirements.txt is a historical freeze
+# and is intentionally excluded because its platform pins conflict with Docling.
 COPY requirements-api.txt .
 COPY requirements-workers.txt .
+COPY requirements-rag.txt .
 ARG CACHE_DATE=1
 RUN pip install --upgrade pip && \
-    pip install -r requirements.txt -r requirements-api.txt -r requirements-workers.txt
+    pip install -r requirements-workers.txt -r requirements-rag.txt
 
 # ==========================================
 # Stage 3: Production Runner
@@ -58,6 +59,8 @@ COPY core/ ./core/
 COPY plugins/ ./plugins/
 COPY runtime/ ./runtime/
 COPY brixta_sdk/ ./brixta_sdk/
+COPY brixta_mcp/ ./brixta_mcp/
+COPY brixta_cli/ ./brixta_cli/
 COPY infra/ ./infra/
 
 # Install drizzle deps inside infra folder

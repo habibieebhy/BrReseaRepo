@@ -12,7 +12,6 @@ spec:
       labels:
         app: gateway
     spec:
-      serviceAccountName: brixta-control-plane
       containers:
       - name: gateway
         image: docker.io/goswamirohit/brresearepo:v5

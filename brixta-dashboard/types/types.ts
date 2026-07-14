@@ -70,8 +70,8 @@ export interface KnowledgeBase {
   manifest_url: string;
   retrieval_url: string;
   mcp_url: string;
-  mcp_scope: { knowledge_base_id: string };
-  mcp_command: string;
+  mcp_scope: { knowledge_base_id: string; tenant_id: string };
+  mcp_tools: string[];
   chatgpt_ready: boolean;
 }
 

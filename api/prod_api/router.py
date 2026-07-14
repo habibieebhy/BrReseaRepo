@@ -1,3 +1,7 @@
+import json
+import os
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -36,7 +40,6 @@ from api.prod_api.health import (
     database,
     redis,
     storage,
-    kubernetes,
 )
 
 # ---------------------------------------------------------------------
@@ -46,19 +49,6 @@ from api.prod_api.health import (
 from api.prod_api.queues import (
     broker_health,
     queues,
-)
-
-# ---------------------------------------------------------------------
-# Kubernetes
-# ---------------------------------------------------------------------
-
-from api.prod_api.kubernetes import (
-    cluster_health,
-    list_pods,
-    list_deployments,
-    pod_logs,
-    restart_deployment,
-    restart_pod,
 )
 
 # ---------------------------------------------------------------------
@@ -74,14 +64,6 @@ from api.prod_api.celery import (
     stats,
 )
 # ---------------------------------------------------------------------
-# Plugins
-# ---------------------------------------------------------------------
-
-from api.prod_api.plugins import (
-    embedding_plugins,
-)
-
-# ---------------------------------------------------------------------
 # Docker
 # ---------------------------------------------------------------------
 
@@ -95,6 +77,7 @@ from api.prod_api.docker import (
 from runtime.jobs.repository import JobRepository
 from runtime.jobs.service import JobRetryError, retry_failed_job
 from runtime.knowledge import (
+    KnowledgeAccessRepository,
     KnowledgeBaseError,
     describe_knowledge_base,
     fetch_chunk,
@@ -106,6 +89,10 @@ from runtime.knowledge import (
 class KnowledgeSearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=4000)
     limit: int = Field(default=5, ge=1, le=20)
+
+
+class KnowledgeAccessRequest(BaseModel):
+    enabled: bool
 
 router = APIRouter()
 
@@ -167,6 +154,7 @@ def knowledge_base(job_id: str):
 @router.post("/knowledge/{job_id}/search")
 def knowledge_search(job_id: str, payload: KnowledgeSearchRequest):
     try:
+        manifest = describe_knowledge_base(job_id)
         return {
             "knowledge_base_id": job_id,
             "query": payload.query,
@@ -174,6 +162,7 @@ def knowledge_search(job_id: str, payload: KnowledgeSearchRequest):
                 job_id,
                 payload.query,
                 limit=payload.limit,
+                tenant_id=manifest["tenant_id"],
             ),
         }
     except KnowledgeBaseError as exc:
@@ -183,14 +172,100 @@ def knowledge_search(job_id: str, payload: KnowledgeSearchRequest):
 @router.get("/knowledge/{job_id}/chunks/{chunk_index}")
 def knowledge_chunk(job_id: str, chunk_index: int):
     try:
-        return fetch_chunk(f"{job_id}:{chunk_index}", knowledge_base_id=job_id)
+        manifest = describe_knowledge_base(job_id)
+        return fetch_chunk(
+            f"{job_id}:{chunk_index}",
+            knowledge_base_id=job_id,
+            tenant_id=manifest["tenant_id"],
+        )
     except KnowledgeBaseError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-from api.prod_api.plugins import (
-    embedding_plugins,
-    downloader_plugins,
-)
+
+@router.get("/knowledge/{job_id}/access")
+def knowledge_access(job_id: str):
+    try:
+        manifest = describe_knowledge_base(job_id)
+    except KnowledgeBaseError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "knowledge_base_id": job_id,
+        "tenant_id": manifest["tenant_id"],
+        "enabled": KnowledgeAccessRepository.is_enabled(manifest["tenant_id"], job_id),
+    }
+
+
+@router.put("/knowledge/{job_id}/access")
+def update_knowledge_access(job_id: str, payload: KnowledgeAccessRequest):
+    try:
+        manifest = describe_knowledge_base(job_id)
+    except KnowledgeBaseError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    enabled = KnowledgeAccessRepository.set_enabled(
+        manifest["tenant_id"],
+        job_id,
+        payload.enabled,
+    )
+    return {"knowledge_base_id": job_id, "enabled": enabled}
+
+
+@router.get("/mcp/status")
+def mcp_status():
+    state_path = Path(".brixta/connection.json")
+    state = {}
+    if state_path.exists():
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            state = {}
+    def process_alive(pid: object) -> bool:
+        if isinstance(pid, bool):
+            return False
+
+        if isinstance(pid, int):
+            process_id = pid
+        elif isinstance(pid, str):
+            try:
+                process_id = int(pid)
+            except ValueError:
+                return False
+        else:
+            return False
+
+        # PID zero and negative PIDs address process groups rather than one
+        # BRIXTA-managed process, so they must never be probed here.
+        if process_id <= 0:
+            return False
+
+        try:
+            os.kill(process_id, 0)
+            return True
+        except (OSError, OverflowError):
+            return False
+
+    mcp_alive = process_alive(state.get("mcp_pid"))
+    tunnel_alive = process_alive(state.get("tunnel_pid"))
+    public_url = state.get("mcp_url") or os.getenv("BRIXTA_MCP_PUBLIC_URL", "")
+    configured = bool(public_url.startswith("https://"))
+    local_client = state.get("mode") == "local-client" and public_url.startswith(
+        ("http://127.0.0.1", "http://localhost")
+    )
+    return {
+        "connected": (
+            local_client and mcp_alive
+        ) or (
+            configured and (
+                (mcp_alive and tunnel_alive)
+                if state.get("mode") == "local"
+                else True
+            )
+        ),
+        "mode": state.get("mode") or ("production" if configured else "disconnected"),
+        "mcp_url": public_url if configured or local_client else None,
+        "authenticated": state.get("auth_mode") == "oauth-local" or os.getenv("BRIXTA_MCP_AUTH_MODE") == "jwt",
+        "shared_gateway": True,
+    }
+
 from api.prod_api.plugins import (
     embedding_plugins,
     downloader_plugins,
@@ -286,11 +361,6 @@ def storage_backend_health():
     return storage()
 
 
-@router.get("/health/kubernetes")
-def kubernetes_health():
-    return kubernetes()
-
-
 # =====================================================================
 # Redis
 # =====================================================================
@@ -303,40 +373,6 @@ def redis_info():
 @router.get("/redis/queues")
 def redis_queues():
     return queues()
-
-
-# =====================================================================
-# Kubernetes
-# =====================================================================
-
-@router.get("/kubernetes")
-def kubernetes_info():
-    return cluster_health()
-
-
-@router.get("/kubernetes/pods")
-def kubernetes_pods():
-    return list_pods()
-
-
-@router.get("/kubernetes/deployments")
-def kubernetes_deployments():
-    return list_deployments()
-
-
-@router.get("/kubernetes/pods/{namespace}/{name}/logs")
-def kubernetes_pod_logs(namespace: str, name: str, tail: int = 200):
-    return pod_logs(namespace, name, tail)
-
-
-@router.post("/kubernetes/deployments/{namespace}/{name}/restart")
-def kubernetes_restart_deployment(namespace: str, name: str):
-    return restart_deployment(namespace, name)
-
-
-@router.post("/kubernetes/pods/{namespace}/{name}/restart")
-def kubernetes_restart_pod(namespace: str, name: str):
-    return restart_pod(namespace, name)
 
 
 # =====================================================================

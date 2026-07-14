@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: brixta-mcp
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - mcp.example.com
+      secretName: brixta-mcp-tls
+  rules:
+    - host: mcp.example.com
+      http:
+        paths:
+          # A dedicated host routes OAuth discovery/registration paths as well
+          # as /mcp. Restricting this Ingress to /mcp breaks client discovery.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: brixta-mcp-service
+                port:
+                  number: 80

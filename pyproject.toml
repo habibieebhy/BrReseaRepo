@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "brixta"
+version = "2.1.0"
+description = "Integration-first AI ingestion, retrieval, and MCP runtime"
+requires-python = ">=3.11,<3.14"
+
+[project.scripts]
+brixta = "brixta_cli.main:main"
+
+[tool.setuptools.packages.find]
+include = ["api*", "brixta_cli*", "brixta_mcp*", "brixta_sdk*", "core*", "plugins*", "runtime*"]

@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brixta-mcp
+  namespace: default
+  labels:
+    app: brixta-mcp
+    component: integration-gateway
+spec:
+  # Keep one replica until MCP session affinity or a shared session store is configured.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: brixta-mcp
+  template:
+    metadata:
+      labels:
+        app: brixta-mcp
+        component: integration-gateway
+    spec:
+      containers:
+        - name: mcp
+          image: docker.io/goswamirohit/brresearepo:v5
+          command: ["python", "-m", "api.mcp_server"]
+          ports:
+            - containerPort: 8001
+              name: mcp-http
+          env:
+            - name: BRIXTA_MCP_HOST
+              value: "0.0.0.0"
+            - name: BRIXTA_MCP_PORT
+              value: "8001"
+            - name: BRIXTA_MCP_TRANSPORT
+              value: "http"
+          envFrom:
+            - secretRef:
+                name: app-secrets
+            - secretRef:
+                name: brixta-mcp-secrets
+          readinessProbe:
+            tcpSocket:
+              port: mcp-http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: mcp-http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"

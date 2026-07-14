@@ -12,17 +12,18 @@ from runtime.artifacts.repository import ArtifactRepository
 
 
 @lru_cache(maxsize=2)
-def load_embedding_model(model: str, trust_remote_code: bool, revision: str | None) -> SentenceTransformer:
-    """Load and cache approved embedding models inside each worker process.
-
-    Trust and revision are supplied by the registry's approved model profile,
-    never inferred from an arbitrary user-supplied model name.
-    """
+def load_embedding_model(
+    model: str,
+    trust_remote_code: bool,
+    revision: str | None,
+    device: str = "cpu",
+) -> SentenceTransformer:
+    """Load and cache an approved embedding model for a specific device."""
     return SentenceTransformer(
         model,
         trust_remote_code=trust_remote_code,
         revision=revision,
-        device="cpu",
+        device=device,
     )
 
 
@@ -51,9 +52,10 @@ class SentenceTransformersEmbeddingPlugin(EmbeddingPlugin):
         )
 
         embedding_model = load_embedding_model(
-            model,
-            bool(profile["trust_remote_code"]),
-            profile.get("revision"),
+        model,
+        bool(profile["trust_remote_code"]),
+        profile.get("revision"),
+        str(profile.get("device", "cpu")),
         )
 
         embedded_chunks = []

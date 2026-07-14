@@ -10,7 +10,7 @@ The long-term goal is straightforward:
 
 > **Become the operating system for AI integrations.**
 
-Today, BRIXTA provides a working ingestion runtime that accepts URLs and files, processes them through selectable plugins, generates model-aware embeddings, stores them in PostgreSQL with pgvector, and exposes operational state through a Next.js dashboard. Retrieval, packaged RAG, MCP serving, marketplace installation, and enterprise hardening are the next major layers—not features that are being claimed as complete today.
+Today, BRIXTA provides a working ingestion and retrieval runtime that accepts URLs and files, processes them through selectable plugins, generates model-aware embeddings, stores them in PostgreSQL with pgvector, and exposes tenant-scoped retrieval through both HTTP and an authenticated shared MCP gateway. Enterprise identity, packaged answer generation, marketplace installation, and broader production hardening remain future layers.
 
 ---
 
@@ -53,14 +53,14 @@ BRIXTA is currently an **end-to-end ingestion MVP and control-plane prototype**.
 | Vector persistence | Working | PostgreSQL + pgvector with model and dimension metadata |
 | Artifact storage | Working | Local filesystem or MinIO |
 | Scheduled sources | Working MVP | Five-field cron expressions checked by Celery Beat once per minute |
-| Dashboard | Working MVP | Ingestion, sources, plugins, settings, jobs, health, Docker, Kubernetes, Celery, Redis, and MinIO views |
+| Dashboard | Working MVP | Ingestion, knowledge, sources, plugins, settings, jobs, health, Docker, Celery, Redis, MinIO, and operator documentation |
 | Recursive crawling | Not implemented | Source schema anticipates it; current HTTP downloader processes only the seed page |
-| Retrieval API | Not implemented | Embeddings are stored, but a search/query service is still required |
-| Ready-made RAG | Not implemented | Retrieval, prompt assembly, citations, and generation must be added |
-| MCP server | Not implemented | Planned as a first-class integration surface |
+| Retrieval API | Working MVP | Knowledge manifests, tenant/model/dimension-safe semantic search, chunk fetching, and citations |
+| Ready-made RAG | Partial | Retrieval and citations work; final answer generation belongs to ChatGPT/local clients or a future generation plugin |
+| MCP server | Working MVP | Shared knowledge/source tools with ephemeral OAuth locally and discoverable JWT/OAuth integration in production |
 | Plugin marketplace | Not implemented | Catalog exists; safe install, update, disable, and uninstall do not |
-| Authentication/RBAC | Not implemented | Tenant IDs are metadata, not an authorization boundary |
-| Production hardening | In progress | Kubernetes manifests and controls exist, but need security and deployment validation |
+| Authentication/RBAC | Partial | MCP derives tenant scope from verified credentials; API/dashboard identity is still required |
+| Production hardening | In progress | Kubernetes deployment manifests exist; release engineering, identity, observability, and validation remain |
 
 ### Proven locally
 
@@ -240,11 +240,15 @@ This is source-level modularity today. Dynamic package installation is intention
 │   └── celery_app.py
 ├── brixta-dashboard/           # Next.js Mission Control
 ├── infra/                      # Drizzle schema and migrations
-├── k8s/                        # Kubernetes workloads and RBAC
+├── brixta_cli/                 # doctor, connect, serve, and knowledge commands
+├── brixta_mcp/                 # authenticated shared MCP gateway and tools
+├── k8s/                        # Kubernetes application workloads
 ├── storage/                    # Local artifacts and control-plane state
 ├── tests/
 ├── requirements-api.txt
+├── requirements-rag.txt
 ├── requirements-workers.txt
+├── pyproject.toml
 └── Dockerfile
 ```
 
@@ -270,10 +274,13 @@ source Resea/bin/activate
 python -m pip install --upgrade pip
 ```
 
-For a full local worker environment:
+For a complete local environment:
 
 ```bash
-pip install -r requirements-workers.txt
+python -m pip install -r requirements-api.txt
+python -m pip install -r requirements-workers.txt
+python -m pip install -r requirements-rag.txt
+python -m pip install -e .
 ```
 
 For an API-only environment:
@@ -482,22 +489,20 @@ The dashboard is operational Mission Control, not a mock-only UI.
 
 | Page | Current behavior |
 | --- | --- |
-| Dashboard | Shows API, Celery, Redis, artifact storage, Docker, and Kubernetes availability |
+| Dashboard | Shows API, Celery, Redis, artifact storage, and Docker availability |
 | Ingestion | URL/file modes, drag-and-drop, per-stage selectors, embedding model selector |
 | Sources | Create, schedule, sync, list, and delete reusable sources |
 | Plugins | Displays installed registry entries, capabilities, versions, defaults, and models |
-| Settings | Select default plugins/model, configure artifact backend, and reorder middle stages |
+| Settings | Select unattended-job plugin defaults and configure the artifact backend; the safe stage order is fixed |
 | Celery | Workers plus active, reserved, scheduled tasks and persisted jobs |
 | Redis | Broker health and queue depths |
 | Storage | Active backend, MinIO objects, bucket, endpoint, and console link |
 | Docker | Container status, logs, and restart controls |
-| Kubernetes | Deployments, pods, logs, and rolling restart controls |
-| Health | Database, Redis, storage, and Kubernetes checks |
-| Marketplace | Honest placeholder describing the missing lifecycle guarantees |
+| Knowledge bases | Discovers ready indexes, searches them, shows access scope, and links to the shared MCP flow |
+| Health | Database, Redis, and storage checks |
+| Documentation | Visual self-hosting, API, MCP, production, plugin, and troubleshooting guide |
 
-Docker and Kubernetes mutation endpoints are powerful. They must be placed behind authentication, authorization, an allowlist, and audit logging before any internet-facing deployment.
-
-Kubernetes views use local kubeconfig during development and an in-cluster service account when deployed. The supplied RBAC permits pod/deployment reads, pod logs, and deployment patches for rolling restart.
+Kubernetes is intentionally not queried or mutated by the dashboard. Operate production clusters through kubectl, GitOps, your managed platform, and a dedicated observability stack.
 
 ---
 
@@ -712,18 +717,18 @@ The source and settings repositories currently use local JSON files. Replace the
 
 ---
 
-## From ingestion to ready-made RAG
+## Retrieval, RAG, and the shared MCP gateway
 
-BRIXTA currently completes the **indexing half** of RAG:
+BRIXTA provides both indexing and the reusable retrieval half of RAG:
 
 ```text
 source -> parse -> chunk -> embed -> store
 ```
 
-A ready-made RAG service adds:
+The connected model completes generation:
 
 ```text
-question -> query embedding -> filtered vector search -> context assembly -> LLM -> cited answer
+question -> BRIXTA query embedding -> filtered vector search -> fetched evidence -> LLM -> cited answer
 ```
 
 ### Required retrieval invariants
@@ -757,51 +762,154 @@ LIMIT %(limit)s;
 
 For scale, create model/dimension-specific partial or expression vector indexes. A single unconstrained `vector` column cannot use one ordinary fixed-dimension ANN index for every model shape.
 
-### Recommended BRIXTA RAG layer
-
-Add these components:
+### Implemented BRIXTA retrieval layer
 
 ```text
-runtime/retrieval/service.py     # query embedding and pgvector search
-api/query.py                     # authenticated retrieval/RAG endpoints
-brixta_sdk/generation.py         # optional generation provider contract
-plugins/generation/              # OpenAI, local, or other LLM providers
-runtime/citations/               # source and chunk attribution
-mcp/                             # BRIXTA MCP server
+runtime/knowledge/service.py     # manifests, query embedding, pgvector search, fetch
+api/prod_api/router.py           # knowledge and retrieval HTTP endpoints
+brixta_mcp/                      # authenticated shared MCP gateway
+brixta_cli/                      # doctor, serve, connect, and knowledge commands
 ```
 
-The first useful API can be:
+The supported retrieval APIs are:
 
 ```text
-POST /query/search   -> retrieved chunks only
-POST /query/answer   -> generated answer plus citations
+GET  /prod/knowledge                         -> ready indexes
+GET  /prod/knowledge/{id}                    -> manifest
+POST /prod/knowledge/{id}/search             -> ranked chunks
+GET  /prod/knowledge/{id}/chunks/{index}     -> full evidence and citation metadata
 ```
 
 Keep retrieval separate from generation. That allows BRIXTA to serve search results to ChatGPT, another model, an agent framework, or a custom application without forcing a particular LLM.
 
-### MCP integration target
+### Shared MCP tools
 
-An MCP server should expose narrow tools such as:
+The gateway exposes narrow tools:
 
-- `brixta_search(query, tenant_id, source_ids?, limit?)`
-- `brixta_get_chunk(chunk_id)`
-- `brixta_list_sources(tenant_id)`
+- `brixta_list_knowledge_bases(limit?)`
+- `brixta_search(query, knowledge_base_id, limit?)`
+- `brixta_get_chunk(result_id)`
+- `brixta_list_sources()`
 - `brixta_sync_source(source_id)`
 
-The MCP layer must authenticate the caller and derive tenant access from authorization—not trust a tenant ID supplied by the model. Search results should include document identity, chunk identity, source URL/file metadata, and relevance score so the model can cite evidence.
+The MCP layer authenticates the caller and derives tenant access from authorization—it never accepts `tenant_id` as a tool argument. Local mode exposes an ephemeral OAuth 2.1 server with dynamic client registration; production advertises an external authorization server and validates JWTs with a public key or JWKS endpoint.
 
-### Connecting another application today
+Per-knowledge-base MCP access is stored in `"BrResearch".knowledge_access`, not in a pod-local file. Migration `infra/drizzle/0006_knowledge_access.sql` and the repository's idempotent table check keep the dashboard API and MCP deployment on the same access policy. The `0006` number preserves the existing `0005_job_recovery.sql` migration in upgraded projects.
 
-Until the retrieval API exists, an application can:
+### Connect ChatGPT or another MCP client
 
-1. select an approved model profile;
-2. generate a normalized query vector using the profile's query prefix;
-3. execute the filtered SQL above;
-4. assemble the top chunks into a prompt;
-5. send that prompt to the LLM of choice;
-6. return chunk/job references as citations.
+Install the CLI and run the complete local preflight:
 
-That path works, but the goal is to make it a supported BRIXTA service instead of application-specific glue.
+```bash
+python -m pip install -e .
+brixta doctor
+```
+
+For a local ChatGPT handoff, install Cloudflare Tunnel and run:
+
+```bash
+brew install cloudflared
+brixta connect chatgpt --local
+```
+
+The command validates the runtime, selects the permitted tenant, creates a public HTTPS tunnel, starts the shared OAuth-capable MCP gateway, performs an end-to-end DCR + PKCE exchange, lists all five MCP tools through the public tunnel, saves local process state, prints the MCP URL, and opens ChatGPT's Plugins page for the unavoidable one-time approval. Stop managed local processes with:
+
+```bash
+brixta disconnect
+```
+
+Production uses `BRIXTA_MCP_AUTH_MODE=jwt` and a stable HTTPS endpoint. After deployment:
+
+```bash
+export BRIXTA_MCP_PUBLIC_URL=https://mcp.example.com/mcp
+brixta connect chatgpt
+```
+
+### Connect any local MCP client
+
+The gateway is standard streamable HTTP MCP; ChatGPT is only one client. For a
+local MCP-capable application, start a tenant-bound loopback gateway:
+
+```bash
+brixta connect client --local --tenant YOUR_TENANT_ID
+```
+
+The command runs the full doctor checks, starts the shared gateway on
+`http://127.0.0.1:8001/mcp`, verifies all five tools with a real MCP
+`initialize` + `tools/list` exchange, prints a generic configuration, and saves
+the process for `brixta disconnect`.
+
+Typical HTTP client configuration:
+
+```json
+{
+  "mcpServers": {
+    "brixta": {
+      "url": "http://127.0.0.1:8001/mcp"
+    }
+  }
+}
+```
+
+Client configuration field names vary. Select **streamable HTTP** when the
+client asks for a transport. The unauthenticated mode is deliberately bound to
+loopback and must never be exposed to another machine. Remote clients should
+use the HTTPS gateway with OAuth/JWT authentication.
+
+For clients that launch stdio MCP servers themselves:
+
+```json
+{
+  "mcpServers": {
+    "brixta": {
+      "command": "/absolute/path/to/Resea/bin/python",
+      "args": ["-m", "api.mcp_server"],
+      "env": {
+        "BRIXTA_MCP_AUTH_MODE": "none",
+        "BRIXTA_MCP_TENANT_ID": "YOUR_TENANT_ID",
+        "BRIXTA_MCP_TRANSPORT": "stdio"
+      }
+    }
+  }
+}
+```
+
+### Use BRIXTA with Ollama
+
+Ollama supplies the model and tool-calling API; an MCP-capable host must still
+discover and execute BRIXTA tools. Use either an existing MCP host configured
+with the URL above or the included minimal bridge:
+
+```bash
+# Terminal 1: install and start a tool-capable local model
+ollama pull qwen3
+
+# Terminal 2: start BRIXTA's generic local MCP connection
+brixta connect client --local --tenant YOUR_TENANT_ID
+
+# Terminal 3: install the optional Ollama SDK and run the agent loop
+python -m pip install -r requirements-ollama.txt
+python examples/ollama_mcp_agent.py \
+  --model qwen3 \
+  "Search my available knowledge bases and summarize the deployment process."
+```
+
+The bridge translates MCP tool schemas to Ollama function tools, executes
+BRIXTA calls, returns tool results to the model, and stops after eight tool
+rounds. Choose an Ollama model with tool support and use a large enough context
+window; the example requests 32K tokens. A model without tool calling can still
+use BRIXTA through retrieval-first RAG, where your application calls the search
+API before sending evidence to Ollama.
+
+### Client/authentication matrix
+
+| Client type | Command or endpoint | Authentication |
+| --- | --- | --- |
+| ChatGPT, local development | `brixta connect chatgpt --local` | Ephemeral OAuth 2.1 through HTTPS tunnel |
+| Any MCP client on the same machine | `brixta connect client --local --tenant …` | Loopback-only, tenant fixed at startup |
+| Stdio MCP client | Launch `python -m api.mcp_server` with the environment above | Process boundary; no network listener |
+| Remote/production MCP client | `https://mcp.your-domain.com/mcp` | External OAuth/JWT |
+| Ollama | MCP-capable host or `examples/ollama_mcp_agent.py` | Follows the selected MCP connection mode |
 
 ---
 
@@ -811,20 +919,20 @@ That path works, but the goal is to make it a supported BRIXTA service instead o
 
 - **Local development:** API, Celery, Beat, Redis, PostgreSQL, optional MinIO, and dashboard.
 - **Docker image:** a current single image exists, but dependency layering should be split before production optimization.
-- **Kubernetes:** manifests exist for gateway, workers, scheduler, Redis, MinIO, PVC, autoscaling, migrations, secrets, and control-plane RBAC.
+- **Kubernetes:** manifests exist for gateway, workers, scheduler, Redis, MinIO, PVC, autoscaling, migrations, secrets, dashboard, and the MCP gateway.
 
-### Kubernetes control behavior
+### Kubernetes operating model
 
-The gateway uses local kubeconfig during development and in-cluster configuration in Kubernetes. The dashboard can list pods/deployments, read recent pod logs, and request a rolling deployment restart by patching a pod-template annotation.
+BRIXTA treats Kubernetes as a declarative deployment target. The application does not require Kubernetes API credentials and the user dashboard does not poll pods, read cluster logs, or expose restart actions. Apply and observe the supplied workloads with your normal platform tooling.
 
 Before production:
 
 - replace development image references and hard-coded MinIO credentials;
-- apply least-privilege namespace-scoped RBAC where possible;
+- keep application service accounts free of cluster-management privileges;
 - verify `REDIS_URL` consistently across all workloads;
 - separate API, parser, embedding, and migration images/dependencies;
 - add readiness/liveness probes;
-- validate scheduler and RBAC deployment in the release path;
+- validate scheduler and MCP deployment in the release path;
 - add network policies, TLS, ingress, authentication, and audit logs;
 - convert manifests into versioned Helm charts or an operator.
 
@@ -839,7 +947,6 @@ Known security work:
 - authenticate API and dashboard users;
 - enforce tenant authorization server-side;
 - protect Docker restart/log access;
-- protect Kubernetes log/restart access;
 - prevent arbitrary internal URL access in the HTTP downloader (SSRF controls);
 - validate uploaded content beyond filename extensions;
 - add malware scanning and document sandboxing;

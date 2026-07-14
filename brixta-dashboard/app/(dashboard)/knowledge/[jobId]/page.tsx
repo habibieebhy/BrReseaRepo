@@ -43,7 +43,7 @@ export default function KnowledgeDetailPage() {
     <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
       <Button variant="ghost" render={<Link href="/knowledge" />}><ArrowLeft size={15} /> All knowledge bases</Button>
       {knowledgeBase && <KnowledgeConnectionCard knowledgeBase={knowledgeBase} />}
-      <Card>
+      <Card id="retrieval">
         <CardHeader><CardTitle>Retrieval playground</CardTitle><CardDescription>Test the same semantic search exposed to local model UIs and the MCP server.</CardDescription></CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={search} className="flex gap-2"><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ask about this knowledge base…" required /><Button type="submit" disabled={busy}>{busy ? <LoaderCircle className="animate-spin" size={16} /> : <Search size={16} />} Search</Button></form>

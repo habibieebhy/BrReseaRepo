@@ -9,6 +9,7 @@ import {
   boolean,
   jsonb,
   uniqueIndex,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 // -----------------------------------------------------------------------------
@@ -108,4 +109,24 @@ export const documentChunks = brixtaSchema.table("document_chunks", {
   embedding: vector("embedding").notNull(),
 }, (table) => [
   uniqueIndex("document_chunks_job_chunk_idx").on(table.jobId, table.chunkIndex),
+]);
+
+// -----------------------------------------------------------------------------
+// Knowledge access
+// Shared by the dashboard API and MCP gateway; default-ready knowledge remains
+// visible until an explicit tenant-scoped disable row is written.
+// -----------------------------------------------------------------------------
+
+export const knowledgeAccess = brixtaSchema.table("knowledge_access", {
+  tenantId: text("tenant_id").notNull(),
+  knowledgeBaseId: uuid("knowledge_base_id")
+    .notNull()
+    .references(() => ingestionJobs.id, { onDelete: "cascade" }),
+  enabled: boolean("enabled").default(true).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  primaryKey({
+    name: "knowledge_access_tenant_knowledge_pk",
+    columns: [table.tenantId, table.knowledgeBaseId],
+  }),
 ]);

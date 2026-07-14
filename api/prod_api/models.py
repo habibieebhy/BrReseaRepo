@@ -19,25 +19,6 @@ class ServicesResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------
-# Kubernetes
-# ---------------------------------------------------------------------
-
-
-class Pod(BaseModel):
-    name: str
-    namespace: str
-    status: str
-    node: str | None = None
-
-
-class Deployment(BaseModel):
-    name: str
-    namespace: str
-    replicas: int
-    available: int
-
-
-# ---------------------------------------------------------------------
 # Celery
 # ---------------------------------------------------------------------
 

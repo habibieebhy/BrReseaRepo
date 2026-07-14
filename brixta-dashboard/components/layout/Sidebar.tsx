@@ -10,11 +10,9 @@ import {
   Database,
   Settings,
   Container,
-  Boxes,
   Flower2,
   Server,
   Globe2,
-  Store,
   BookOpen,
   BrainCircuit,
 } from "lucide-react";
@@ -64,11 +62,6 @@ const sections = [
         icon: Container,
       },
       {
-        name: "Kubernetes",
-        href: "/kubernetes",
-        icon: Boxes,
-      },
-      {
         name: "Celery (Jobs)",
         href: "/celery",
         icon: Flower2,
@@ -88,11 +81,6 @@ const sections = [
   {
     title: "Resources",
     items: [
-      {
-        name: "Marketplace",
-        href: "/marketplace",
-        icon: Store,
-      },
       {
         name: "Documentation",
         href: "/docs",

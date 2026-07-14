@@ -29,7 +29,13 @@ def _schedule_due(source: dict) -> bool:
         nowfun=lambda: datetime.now(zone),
     )
     previous = source.get("last_run_at") or source["created_at"]
-    return schedule.is_due(datetime.fromisoformat(previous)).is_due
+    last_run = (
+        previous
+        if isinstance(previous, datetime)
+        else datetime.fromisoformat(previous)
+    )
+    due, _next_check = schedule.is_due(last_run)
+    return bool(due)
 
 
 @celery.task(name="runtime.tasks.schedules.dispatch_due_sources")

@@ -27,6 +27,7 @@ class ModelSpec:
     normalize: bool = True
     trust_remote_code: bool = False
     revision: str | None = None
+    device: str = "cpu"
     default: bool = False
 
     def public_dict(self) -> dict[str, Any]:

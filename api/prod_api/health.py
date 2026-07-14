@@ -1,4 +1,3 @@
-from api.prod_api.kubernetes import cluster_health
 from api.prod_api.queues import broker_health
 from api.prod_api.storage import provider as storage_provider
 from core.database import get_connection
@@ -53,14 +52,6 @@ def storage() -> dict:
     }
 
 
-def kubernetes() -> dict:
-    """
-    Returns Kubernetes health.
-    """
-
-    return cluster_health()
-
-
 def health() -> dict:
     """
     Returns the overall BRIXTA infrastructure health.
@@ -71,7 +62,6 @@ def health() -> dict:
         "database": database(),
         "redis": redis(),
         "storage": storage(),
-        "kubernetes": kubernetes(),
     }
 
     overall = all(

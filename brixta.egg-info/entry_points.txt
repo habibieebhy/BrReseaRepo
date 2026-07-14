@@ -1,0 +1,2 @@
+[console_scripts]
+brixta = brixta_cli.main:main

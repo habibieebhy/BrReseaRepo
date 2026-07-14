@@ -71,6 +71,18 @@ BRIXTA_MCP_PUBLIC_URL = os.getenv(
     "http://localhost:8001/mcp",
 ).rstrip("/")
 
+# ---------------------------------------------------------------------
+# Shared MCP gateway
+# ---------------------------------------------------------------------
+
+BRIXTA_MCP_AUTH_MODE = os.getenv("BRIXTA_MCP_AUTH_MODE", "static").strip().lower()
+BRIXTA_MCP_TOKEN = os.getenv("BRIXTA_MCP_TOKEN", "")
+BRIXTA_MCP_TENANT_ID = os.getenv("BRIXTA_MCP_TENANT_ID", "")
+BRIXTA_MCP_JWKS_URI = os.getenv("BRIXTA_MCP_JWKS_URI", "")
+BRIXTA_MCP_JWT_PUBLIC_KEY = os.getenv("BRIXTA_MCP_JWT_PUBLIC_KEY", "")
+BRIXTA_MCP_JWT_ISSUER = os.getenv("BRIXTA_MCP_JWT_ISSUER", "")
+BRIXTA_MCP_JWT_AUDIENCE = os.getenv("BRIXTA_MCP_JWT_AUDIENCE", "")
+
 #----------------------------------------------------------------------
 #Artifact
 #----------------------------------------------------------------------

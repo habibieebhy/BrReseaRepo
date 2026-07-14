@@ -8,6 +8,7 @@ from psycopg import sql
 from core.config import (
     BRIXTA_API_PUBLIC_URL,
     BRIXTA_DASHBOARD_PUBLIC_URL,
+    BRIXTA_MCP_AUTH_MODE,
     BRIXTA_MCP_PUBLIC_URL,
 )
 from core.database import get_connection
@@ -38,12 +39,18 @@ def _row_to_manifest(row: tuple[Any, ...]) -> dict[str, Any]:
         "manifest_url": f"{BRIXTA_API_PUBLIC_URL}/prod/knowledge/{job_id}",
         "retrieval_url": f"{BRIXTA_API_PUBLIC_URL}/prod/knowledge/{job_id}/search",
         "mcp_url": BRIXTA_MCP_PUBLIC_URL,
-        "mcp_scope": {"knowledge_base_id": job_id},
-        "mcp_command": (
-            f"BRIXTA_KNOWLEDGE_BASE_ID={job_id} "
-            "python -m api.mcp_server"
+        "mcp_scope": {"knowledge_base_id": job_id, "tenant_id": row[3]},
+        "mcp_tools": [
+            "brixta_list_knowledge_bases",
+            "brixta_search",
+            "brixta_get_chunk",
+            "brixta_list_sources",
+            "brixta_sync_source",
+        ],
+        "chatgpt_ready": (
+            BRIXTA_MCP_PUBLIC_URL.startswith("https://")
+            and BRIXTA_MCP_AUTH_MODE in {"oauth-local", "jwt"}
         ),
-        "chatgpt_ready": BRIXTA_MCP_PUBLIC_URL.startswith("https://"),
     }
 
 
@@ -92,11 +99,20 @@ def list_knowledge_bases(
     return [_row_to_manifest(row) for row in rows]
 
 
-def describe_knowledge_base(job_id: str) -> dict[str, Any]:
-    query = _knowledge_query(sql.SQL("WHERE j.id = %s"))
+def describe_knowledge_base(
+    job_id: str,
+    *,
+    tenant_id: str | None = None,
+) -> dict[str, Any]:
+    where = sql.SQL("WHERE j.id = %s")
+    params: list[Any] = [job_id]
+    if tenant_id:
+        where += sql.SQL(" AND j.tenant_id = %s")
+        params.append(tenant_id)
+    query = _knowledge_query(where)
     with get_connection() as conn:
         with conn.cursor() as cursor:
-            cursor.execute(query, (job_id,))
+            cursor.execute(query, params)
             row = cursor.fetchone()
     if row is None:
         raise KnowledgeBaseError("Knowledge base not found.")
@@ -123,7 +139,7 @@ def _query_vector(model_id: str, plugin_id: str, query: str) -> list[float]:
         profile.id,
         profile.trust_remote_code,
         profile.revision,
-        str(getattr(profile, "device", "cpu")),
+        profile.device,
     )
     vector = model.encode(
         f"{profile.query_prefix}{query}",
@@ -141,19 +157,20 @@ def search_knowledge_base(
     query: str,
     *,
     limit: int = 5,
+    tenant_id: str,
 ) -> list[dict[str, Any]]:
     if not query.strip():
         return []
-    manifest = describe_knowledge_base(job_id)
+    manifest = describe_knowledge_base(job_id, tenant_id=tenant_id)
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT context_json->'plugins'->>'embedding'
                 FROM "BrResearch".ingestion_jobs
-                WHERE id = %s
+                WHERE id = %s AND tenant_id = %s
                 """,
-                (job_id,),
+                (job_id, tenant_id),
             )
             plugin_row = cursor.fetchone()
     plugin_id = (plugin_row[0] if plugin_row else None) or "sentence-transformers"
@@ -168,6 +185,7 @@ def search_knowledge_base(
                     1 - (embedding <=> %s::vector) AS score
                 FROM "BrResearch".document_chunks
                 WHERE job_id = %s
+                  AND tenant_id = %s
                   AND embedding_model = %s
                   AND embedding_dimension = %s
                 ORDER BY embedding <=> %s::vector
@@ -176,6 +194,7 @@ def search_knowledge_base(
                 (
                     json.dumps(vector),
                     job_id,
+                    tenant_id,
                     manifest["embedding_model"],
                     manifest["embedding_dimension"],
                     json.dumps(vector),
@@ -201,7 +220,12 @@ def search_knowledge_base(
     ]
 
 
-def fetch_chunk(result_id: str, *, knowledge_base_id: str | None = None) -> dict[str, Any]:
+def fetch_chunk(
+    result_id: str,
+    *,
+    knowledge_base_id: str | None = None,
+    tenant_id: str,
+) -> dict[str, Any]:
     try:
         job_id, chunk_index_text = result_id.rsplit(":", 1)
         chunk_index = int(chunk_index_text)
@@ -209,16 +233,18 @@ def fetch_chunk(result_id: str, *, knowledge_base_id: str | None = None) -> dict
         raise KnowledgeBaseError("Invalid BRIXTA result ID.") from exc
     if knowledge_base_id and job_id != knowledge_base_id:
         raise KnowledgeBaseError("The result does not belong to this knowledge base.")
-    manifest = describe_knowledge_base(job_id)
+    manifest = describe_knowledge_base(job_id, tenant_id=tenant_id)
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT content, embedding_model, embedding_dimension
                 FROM "BrResearch".document_chunks
-                WHERE job_id = %s AND chunk_index = %s
+                WHERE job_id = %s
+                  AND chunk_index = %s
+                  AND tenant_id = %s
                 """,
-                (job_id, chunk_index),
+                (job_id, chunk_index, tenant_id),
             )
             row = cursor.fetchone()
     if row is None:

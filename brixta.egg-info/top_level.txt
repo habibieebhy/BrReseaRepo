@@ -1,0 +1,7 @@
+api
+brixta_cli
+brixta_mcp
+brixta_sdk
+core
+plugins
+runtime

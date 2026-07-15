@@ -4,6 +4,27 @@ from abc import ABC, abstractmethod
 class ArtifactBackend(ABC):
 
     # -------------------------
+    # Generic objects
+    # -------------------------
+
+    @abstractmethod
+    def save_object(
+        self,
+        object_name: str,
+        data: bytes,
+        content_type: str = "application/octet-stream",
+    ) -> None: ...
+
+    @abstractmethod
+    def load_object(self, object_name: str) -> bytes: ...
+
+    @abstractmethod
+    def object_exists(self, object_name: str) -> bool: ...
+
+    @abstractmethod
+    def list_objects(self, prefix: str = "", limit: int = 200) -> list[dict]: ...
+
+    # -------------------------
     # Raw
     # -------------------------
 

@@ -12,6 +12,7 @@ import {
   Copy,
   Database,
   FileUp,
+  FlaskConical,
   KeyRound,
   Network,
   PlugZap,
@@ -31,7 +32,9 @@ const sections = [
   ["overview", "Architecture"],
   ["self-host", "Self-host"],
   ["api", "API"],
+  ["simulations", "Simulation Lab"],
   ["chatgpt", "ChatGPT + MCP"],
+  ["clients", "Other clients"],
   ["production", "Production"],
   ["plugins", "Plugins"],
   ["troubleshooting", "Troubleshooting"],
@@ -113,12 +116,51 @@ export default function DocsPage() {
         <Card><CardHeader><CardTitle>Core endpoints</CardTitle><CardDescription>Start at the manifest, then retrieve and fetch citations.</CardDescription></CardHeader><CardContent className="grid gap-2 text-sm md:grid-cols-2">{["GET /plugins", "POST /ingest", "POST /ingest/file", "GET /prod/jobs", "GET /prod/knowledge", "GET /prod/knowledge/{id}", "POST /prod/knowledge/{id}/search", "GET /prod/knowledge/{id}/chunks/{index}", "GET /sources", "POST /sources/{id}/sync"].map(endpoint => <div key={endpoint} className="rounded-xl border bg-muted/30 px-3 py-2 font-mono text-xs">{endpoint}</div>)}</CardContent></Card>
       </section>
 
+      <section id="simulations" className="scroll-mt-20 space-y-5">
+        <div><h2 className="flex items-center gap-3 text-2xl font-bold"><FlaskConical /> Structural & Material Lab</h2><p className="text-muted-foreground">The first BRIXTA Application Pack turns approved knowledge and bounded parameters into deterministic CalculiX cases.</p></div>
+        <div className="grid gap-4 md:grid-cols-4">{[["Evidence", "Attach tenant-owned knowledge and retrieve material assumptions."], ["Validate", "Reject missing, extra, unsafe or incompatible values."], ["Compile", "Write an allowlisted Case Card without arbitrary commands."], ["Run", "Queue CalculiX and preserve inputs, logs, outputs and reports."]].map(([title, body]) => <Card key={title}><CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader><CardContent className="text-sm leading-6 text-muted-foreground">{body}</CardContent></Card>)}</div>
+        <Card><CardHeader><CardTitle>Enable the pack</CardTitle><CardDescription>Apply migration 0006, then start a dedicated worker when solver mode is needed.</CardDescription></CardHeader><CardContent className="space-y-4"><CodeBlock code={"cd infra && npm run db:migrate\n\n# Preview mode needs no solver binary.\n# Solver mode requires ccx on the worker PATH.\nCALCULIX_EXECUTABLE=ccx python -m celery -A runtime.celery_app.celery worker --loglevel=info -Q simulations"} /><p className="text-sm text-muted-foreground">Open <code>/simulations</code>, select a tenant and optional engineering knowledge, validate the Case Card, then queue a preview or solver run. Preview reports only its analytical reference.</p></CardContent></Card>
+        <div className="grid gap-4 lg:grid-cols-2"><Card><CardHeader><CardTitle>Simulation API</CardTitle></CardHeader><CardContent className="space-y-2 text-xs font-mono">{["GET /prod/simulations/case-cards", "POST /prod/simulations/preflight", "POST /prod/simulations/runs", "GET /prod/simulations/runs?tenant_id=...", "GET /prod/simulations/runs/{id}?tenant_id=...", "POST /prod/simulations/runs/{id}/cancel"].map(item => <div key={item} className="rounded-xl bg-muted px-3 py-2">{item}</div>)}</CardContent></Card><Card><CardHeader><CardTitle>Engineering knowledge ingestion</CardTitle></CardHeader><CardContent className="space-y-3 text-sm text-muted-foreground"><p>The engineering text parser accepts CSV, JSON, YAML, XML, CalculiX <code>.inp/.dat</code>, Fortran, C/C++, Python and shell text.</p><p>These files pass through normal embeddings and can be attached as evidence during simulation preflight.</p></CardContent></Card></div>
+      </section>
+
       <section id="chatgpt" className="scroll-mt-20 space-y-5">
         <div><h2 className="text-2xl font-bold">Connect ChatGPT and MCP clients</h2><p className="text-muted-foreground">One shared gateway discovers every ready knowledge base permitted by the authenticated tenant.</p></div>
         <Card className="overflow-hidden"><CardContent className="p-6 md:p-8"><div className="grid items-center gap-4 md:grid-cols-[1fr_auto_1fr_auto_1fr]"><div className="rounded-2xl border p-5 text-center"><Terminal className="mx-auto text-primary" /><p className="mt-3 font-medium">One command</p><code className="mt-2 block text-xs">brixta connect chatgpt --local</code></div><ChevronRight className="mx-auto rotate-90 text-muted-foreground md:rotate-0" /><div className="rounded-2xl border p-5 text-center"><ShieldCheck className="mx-auto text-primary" /><p className="mt-3 font-medium">Secure gateway</p><p className="mt-2 text-xs text-muted-foreground">HTTPS tunnel + tenant-bound OAuth 2.1</p></div><ChevronRight className="mx-auto rotate-90 text-muted-foreground md:rotate-0" /><div className="rounded-2xl border p-5 text-center"><Bot className="mx-auto text-primary" /><p className="mt-3 font-medium">One approval</p><p className="mt-2 text-xs text-muted-foreground">Approve the shared app once in ChatGPT</p></div></div></CardContent></Card>
         <CodeBlock code={`brew install cloudflared\nbrixta connect chatgpt --local`} />
         <Card><CardHeader><CardTitle>One-time ChatGPT approval</CardTitle><CardDescription>The CLI opens the correct page and prints the public MCP URL.</CardDescription></CardHeader><CardContent><ol className="grid gap-3 text-sm text-muted-foreground md:grid-cols-3"><li className="rounded-2xl border p-4"><strong className="text-foreground">1. Developer mode</strong><p className="mt-2">In ChatGPT, open Settings → Security and login and enable Developer mode.</p></li><li className="rounded-2xl border p-4"><strong className="text-foreground">2. Add plugin</strong><p className="mt-2">Open Settings → Plugins, press the plus button, and paste the HTTPS URL ending in <code>/mcp</code>.</p></li><li className="rounded-2xl border p-4"><strong className="text-foreground">3. Approve OAuth</strong><p className="mt-2">Complete the one-time authorization. Future ready knowledge bases appear through the same connection.</p></li></ol></CardContent></Card>
-        <div className="grid gap-4 md:grid-cols-2"><Card><CardHeader><CardTitle className="flex items-center gap-2"><PlugZap size={18} /> Shared tools</CardTitle></CardHeader><CardContent className="space-y-2 text-sm">{["brixta_list_knowledge_bases", "brixta_search", "brixta_get_chunk", "brixta_list_sources", "brixta_sync_source"].map(tool => <div key={tool} className="rounded-xl bg-muted px-3 py-2 font-mono text-xs">{tool}</div>)}</CardContent></Card><Card><CardHeader><CardTitle className="flex items-center gap-2"><KeyRound size={18} /> Security model</CardTitle></CardHeader><CardContent className="space-y-3 text-sm text-muted-foreground"><p>Local mode starts an ephemeral OAuth 2.1 provider with dynamic client registration and binds the approved connection to one tenant.</p><p>Production mode advertises an external authorization server and validates its JWTs using a public key or JWKS endpoint. Tenant identity comes from verified claims—not MCP tool arguments.</p><p>Use <code>brixta disconnect</code> to stop local gateway and tunnel processes.</p></CardContent></Card></div>
+        <div className="grid gap-4 md:grid-cols-2"><Card><CardHeader><CardTitle className="flex items-center gap-2"><PlugZap size={18} /> Shared tools</CardTitle></CardHeader><CardContent className="space-y-2 text-sm">{["brixta_list_knowledge_bases", "brixta_search", "brixta_get_chunk", "brixta_list_sources", "brixta_sync_source", "brixta_list_simulation_runs", "brixta_get_simulation_report"].map(tool => <div key={tool} className="rounded-xl bg-muted px-3 py-2 font-mono text-xs">{tool}</div>)}</CardContent></Card><Card><CardHeader><CardTitle className="flex items-center gap-2"><KeyRound size={18} /> Security model</CardTitle></CardHeader><CardContent className="space-y-3 text-sm text-muted-foreground"><p>Local mode starts an ephemeral OAuth 2.1 provider with dynamic client registration and binds the approved connection to one tenant.</p><p>Production mode advertises an external authorization server and validates its JWTs using a public key or JWKS endpoint. Tenant identity comes from verified claims—not MCP tool arguments.</p><p>Use <code>brixta disconnect</code> to stop local gateway and tunnel processes.</p></CardContent></Card></div>
+      </section>
+
+      <section id="clients" className="scroll-mt-20 space-y-5">
+        <div><h2 className="text-2xl font-bold">Connect other MCP clients and Ollama</h2><p className="text-muted-foreground">BRIXTA uses standard streamable HTTP MCP. ChatGPT is one client, not a runtime requirement.</p></div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card><CardHeader><CardTitle>Any local MCP client</CardTitle><CardDescription>Starts a verified, tenant-bound gateway available only on your machine.</CardDescription></CardHeader><CardContent className="space-y-3"><CodeBlock code={`brixta connect client --local --tenant YOUR_TENANT_ID`} /><CodeBlock code={`{
+  "mcpServers": {
+    "brixta": {
+      "url": "http://127.0.0.1:8001/mcp"
+    }
+  }
+}`} /><p className="text-sm text-muted-foreground">Choose streamable HTTP when the client asks for a transport. Configuration field names vary between clients.</p></CardContent></Card>
+          <Card><CardHeader><CardTitle>Stdio clients</CardTitle><CardDescription>The client starts BRIXTA as a child process; no network listener is exposed.</CardDescription></CardHeader><CardContent><CodeBlock code={`{
+  "mcpServers": {
+    "brixta": {
+      "command": "/path/to/Resea/bin/python",
+      "args": ["-m", "api.mcp_server"],
+      "env": {
+        "BRIXTA_MCP_AUTH_MODE": "none",
+        "BRIXTA_MCP_TENANT_ID": "YOUR_TENANT_ID",
+        "BRIXTA_MCP_TRANSPORT": "stdio"
+      }
+    }
+  }
+}`} /></CardContent></Card>
+        </div>
+        <Card><CardHeader><CardTitle>Ollama model through BRIXTA</CardTitle><CardDescription>Ollama provides the model and function-calling API. An MCP host translates BRIXTA tools into Ollama tools.</CardDescription></CardHeader><CardContent className="grid gap-4 lg:grid-cols-2"><CodeBlock code={`ollama pull qwen3
+brixta connect client --local --tenant YOUR_TENANT_ID
+python -m pip install -r requirements-ollama.txt
+python examples/ollama_mcp_agent.py \
+  --model qwen3 \
+  "Search my knowledge and answer with evidence."`} /><div className="space-y-3 text-sm text-muted-foreground"><p><strong className="text-foreground">Tool-capable model:</strong> the model may choose BRIXTA search and fetch tools itself.</p><p><strong className="text-foreground">Ordinary text model:</strong> your application searches BRIXTA first and inserts the returned chunks into the prompt.</p><p>The included bridge limits the agent to eight tool rounds and requests a 32K context window. Stop the gateway with <code>brixta disconnect</code>.</p></div></CardContent></Card>
       </section>
 
       <section id="production" className="scroll-mt-20 space-y-5">

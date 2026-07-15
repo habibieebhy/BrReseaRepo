@@ -13,6 +13,7 @@ from core.plugin_loader import PLUGIN_STAGES, registry
 from api.sources import router as sources_router
 from runtime.settings import RuntimeSettingsRepository
 from runtime.jobs.repository import JobRepository
+from api.simulations import router as simulations_router
 
 
 class IngestionRequest(BaseModel):
@@ -40,6 +41,11 @@ app.include_router(
     tags=["Production"],
 )
 app.include_router(sources_router)
+app.include_router(
+    simulations_router,
+    prefix="/prod/simulations",
+    tags=["Structural & Material Lab"],
+)
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health():
@@ -124,7 +130,14 @@ async def ingest_file(
     embedding_model: str = Form("nomic-ai/nomic-embed-text-v1.5"),
 ):
     suffix = Path(file.filename or "upload").suffix.lower()
-    allowed = {".pdf", ".docx", ".pptx", ".xlsx", ".html", ".htm", ".md", ".txt"}
+    engineering_text = {
+        ".csv", ".json", ".yaml", ".yml", ".xml", ".inp", ".dat",
+        ".f", ".for", ".c", ".cc", ".cpp", ".h", ".hpp", ".py", ".sh",
+    }
+    allowed = {
+        ".pdf", ".docx", ".pptx", ".xlsx", ".html", ".htm", ".md", ".txt",
+        *engineering_text,
+    }
     if suffix not in allowed:
         raise HTTPException(status_code=415, detail=f"Unsupported file type '{suffix or 'unknown'}'.")
     job_id = str(uuid.uuid4())
@@ -140,6 +153,10 @@ async def ingest_file(
                 upload_path.unlink(missing_ok=True)
                 raise HTTPException(status_code=413, detail="Maximum upload size is 50 MiB.")
             destination.write(chunk)
+    if suffix in engineering_text and parser == "docling":
+        parser = "plain-text"
+    if suffix in engineering_text and chunker == "docling-hybrid":
+        chunker = "text-window"
     selection = {
         "downloader": "local-file",
         "parser": parser,
@@ -147,6 +164,12 @@ async def ingest_file(
         "embedding": embedding,
         "storage": storage,
     }
+    if parser == "plain-text" and chunker != "text-window":
+        upload_path.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=422,
+            detail="Engineering Text Parser requires the Engineering Text Window chunker.",
+        )
     try:
         selection = registry.validate_selection(selection)
     except ValidationError as exc:

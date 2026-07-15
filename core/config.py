@@ -2,8 +2,10 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv()
-load_dotenv("storage/control-plane/runtime.env", override=True)
+# Explicit process/container variables must win over persisted local settings.
+# This is required by local MCP and isolated simulation workers.
+load_dotenv("storage/control-plane/runtime.env", override=False)
+load_dotenv(override=False)
 
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -98,3 +100,23 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ROOT_USER", os.getenv("MINIO_ACCESS_KEY", "m
 MINIO_SECRET_KEY = os.getenv("MINIO_ROOT_PASSWORD", os.getenv("MINIO_SECRET_KEY", "minioadmin"))
 MINIO_BUCKET = os.getenv("MINIO_BUCKET", "brixta")
 MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() == "true"
+
+# ---------------------------------------------------------------------
+# Structural & Material Lab
+# ---------------------------------------------------------------------
+
+CALCULIX_EXECUTABLE = os.getenv("CALCULIX_EXECUTABLE", "ccx").strip() or "ccx"
+OPENFOAM_BLOCKMESH_EXECUTABLE = (
+    os.getenv("OPENFOAM_BLOCKMESH_EXECUTABLE", "blockMesh").strip() or "blockMesh"
+)
+OPENFOAM_CHECKMESH_EXECUTABLE = (
+    os.getenv("OPENFOAM_CHECKMESH_EXECUTABLE", "checkMesh").strip() or "checkMesh"
+)
+OPENFOAM_RUN_EXECUTABLE = os.getenv("OPENFOAM_RUN_EXECUTABLE", "foamRun").strip() or "foamRun"
+OPENFOAM_VTK_EXECUTABLE = (
+    os.getenv("OPENFOAM_VTK_EXECUTABLE", "foamToVTK").strip() or "foamToVTK"
+)
+SIMULATION_TIMEOUT_SECONDS = max(
+    30,
+    min(int(os.getenv("SIMULATION_TIMEOUT_SECONDS", "1800")), 86_400),
+)

@@ -369,6 +369,8 @@ The current `document_chunks.embedding` column is an unconstrained pgvector `vec
 
 ```bash
 python3 -m uvicorn api.main:app --reload
+
+brixta connect chatgpt --local --tenant exampleuser1    
 ```
 
 API documentation is available at `http://127.0.0.1:8000/docs`.

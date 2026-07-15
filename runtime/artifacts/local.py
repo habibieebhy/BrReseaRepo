@@ -12,6 +12,46 @@ class LocalFilesystemBackend(ArtifactBackend):
         directory.mkdir(parents=True, exist_ok=True)
         return directory / filename
 
+    def _object_path(self, object_name: str) -> Path:
+        candidate = (self.ROOT / object_name).resolve()
+        root = self.ROOT.resolve()
+        if candidate != root and root not in candidate.parents:
+            raise ValueError("Artifact object name escapes the storage root.")
+        candidate.parent.mkdir(parents=True, exist_ok=True)
+        return candidate
+
+    def save_object(
+        self,
+        object_name: str,
+        data: bytes,
+        content_type: str = "application/octet-stream",
+    ) -> None:
+        del content_type
+        self._object_path(object_name).write_bytes(data)
+
+    def load_object(self, object_name: str) -> bytes:
+        return self._object_path(object_name).read_bytes()
+
+    def object_exists(self, object_name: str) -> bool:
+        return self._object_path(object_name).is_file()
+
+    def list_objects(self, prefix: str = "", limit: int = 200) -> list[dict]:
+        base = self._object_path(prefix) if prefix else self.ROOT.resolve()
+        if base.is_file():
+            paths = [base]
+        elif base.exists():
+            paths = sorted(path for path in base.rglob("*") if path.is_file())
+        else:
+            paths = []
+        return [
+            {
+                "name": str(path.relative_to(self.ROOT.resolve())),
+                "size": path.stat().st_size,
+                "last_modified": None,
+            }
+            for path in paths[:limit]
+        ]
+
     # --------------------------------------------------
     # Raw
     # --------------------------------------------------

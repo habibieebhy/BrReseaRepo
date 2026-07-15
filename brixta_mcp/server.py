@@ -12,7 +12,11 @@ os.environ.setdefault("FASTMCP_CHECK_FOR_UPDATES", "off")
 from fastmcp import FastMCP
 
 from brixta_mcp.auth import build_auth_provider
-from brixta_mcp.tools import register_knowledge_tools, register_source_tools
+from brixta_mcp.tools import (
+    register_knowledge_tools,
+    register_simulation_tools,
+    register_source_tools,
+)
 
 
 McpTransport = Literal["stdio", "http", "sse", "streamable-http"]
@@ -39,12 +43,15 @@ def create_server() -> FastMCP:
         name="BRIXTA Knowledge Gateway",
         instructions=(
             "Discover the user's BRIXTA knowledge bases, search the most relevant "
-            "one, then fetch supporting chunks before answering. Cite returned URLs."
+            "one, then fetch supporting chunks before answering. Cite returned URLs. "
+            "When discussing engineering simulations, inspect completed BRIXTA "
+            "simulation reports and preserve their stated limitations."
         ),
         auth=build_auth_provider(),
     )
     register_knowledge_tools(server)
     register_source_tools(server)
+    register_simulation_tools(server)
     return server
 
 

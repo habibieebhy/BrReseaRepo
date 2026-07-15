@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-simulations-openfoam
+  labels:
+    app: worker-simulations-openfoam
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker-simulations-openfoam
+  template:
+    metadata:
+      labels:
+        app: worker-simulations-openfoam
+    spec:
+      terminationGracePeriodSeconds: 90
+      containers:
+        - name: celery-openfoam
+          image: your-registry/brixta-openfoam:2.2.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: app-secrets
+          env:
+            - name: REDIS_URL
+              value: redis://redis-service:6379/0
+            - name: SIMULATION_TIMEOUT_SECONDS
+              value: "3600"
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "4"
+              memory: 4Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true

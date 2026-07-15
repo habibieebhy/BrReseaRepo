@@ -15,6 +15,7 @@ import {
   Globe2,
   BookOpen,
   BrainCircuit,
+  FlaskConical,
 } from "lucide-react";
 
 const sections = [
@@ -40,6 +41,11 @@ const sections = [
         name: "Knowledge Bases",
         href: "/knowledge",
         icon: BrainCircuit,
+      },
+      {
+        name: "Simulation Lab",
+        href: "/simulations",
+        icon: FlaskConical,
       },
       {
         name: "Plugins",

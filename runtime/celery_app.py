@@ -32,6 +32,7 @@ celery.conf.update(
         "runtime.tasks.storage",
         "runtime.tasks.schedules",
         "runtime.tasks.reconcile",
+        "runtime.tasks.simulations",
     ),
 
     task_queues=(
@@ -40,6 +41,8 @@ celery.conf.update(
         brixta_queue("chunker"),
         brixta_queue("embeddings"),
         brixta_queue("storage"),
+        brixta_queue("simulations.calculix"),
+        brixta_queue("simulations.openfoam"),
     ),
 
     task_default_queue="downloader",
@@ -70,6 +73,9 @@ celery.conf.update(
         },
         "runtime.tasks.reconcile.reconcile_orphaned_jobs": {
             "queue": "downloader",
+        },
+        "runtime.tasks.simulations.execute_simulation_run": {
+            "queue": "simulations.calculix",
         },
     },
 

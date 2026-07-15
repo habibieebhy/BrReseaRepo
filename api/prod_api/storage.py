@@ -66,10 +66,13 @@ def artifacts(job_id: str) -> dict:
 
 
 def objects(prefix: str = "") -> dict:
-    backend = ArtifactRepository.backend
-    if not hasattr(backend, "objects"):
-        return {"provider": ArtifactRepository.provider(), "objects": [], "message": "Object browsing is available when MinIO is the active artifact backend."}
     try:
-        return {"provider": "minio", "bucket": backend.bucket, "objects": backend.objects(prefix=prefix), "console_url": MINIO_CONSOLE_URL}
+        info = ArtifactRepository.info()
+        return {
+            "provider": ArtifactRepository.provider(),
+            "bucket": info.get("bucket"),
+            "objects": ArtifactRepository.list_objects(prefix=prefix),
+            "console_url": MINIO_CONSOLE_URL if ArtifactRepository.provider() == "minio" else None,
+        }
     except Exception as exc:
-        return {"provider": "minio", "objects": [], "console_url": MINIO_CONSOLE_URL, "error": str(exc)}
+        return {"provider": ArtifactRepository.provider(), "objects": [], "error": str(exc)}

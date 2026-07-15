@@ -136,8 +136,8 @@ export default function IngestionPage() {
                 >
                   <FileUp className="mx-auto mb-3 text-muted-foreground" />
                   <p className="font-medium">Drop a document here</p>
-                  <p className="mb-3 text-xs text-muted-foreground">PDF, Office, HTML, Markdown or text · up to 50 MiB</p>
-                  <Input type="file" accept=".pdf,.docx,.pptx,.xlsx,.html,.htm,.md,.txt" onChange={(event) => setFile(event.target.files?.[0] || null)} required={!file} />
+                  <p className="mb-3 text-xs text-muted-foreground">Documents, engineering configs, solver inputs or source text · up to 50 MiB</p>
+                  <Input type="file" accept=".pdf,.docx,.pptx,.xlsx,.html,.htm,.md,.txt,.csv,.json,.yaml,.yml,.xml,.inp,.dat,.f,.for,.c,.cc,.cpp,.h,.hpp,.py,.sh" onChange={(event) => setFile(event.target.files?.[0] || null)} required={!file} />
                   {file && <p className="mt-3 text-sm">Selected: {file.name}</p>}
                 </div>
               )}

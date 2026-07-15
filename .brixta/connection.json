@@ -3,5 +3,5 @@
   "tenant_id": "exampleuser1",
   "mcp_url": "http://127.0.0.1:8001/mcp",
   "auth_mode": "none",
-  "mcp_pid": 76681
+  "mcp_pid": 8949
 }

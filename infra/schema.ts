@@ -9,6 +9,7 @@ import {
   boolean,
   jsonb,
   uniqueIndex,
+  index,
   primaryKey,
 } from "drizzle-orm/pg-core";
 
@@ -129,4 +130,33 @@ export const knowledgeAccess = brixtaSchema.table("knowledge_access", {
     name: "knowledge_access_tenant_knowledge_pk",
     columns: [table.tenantId, table.knowledgeBaseId],
   }),
+]);
+
+// -----------------------------------------------------------------------------
+// Simulation runs
+// Evidence-aware Case Card executions for solver integrations such as CalculiX.
+// -----------------------------------------------------------------------------
+
+export const simulationRuns = brixtaSchema.table("simulation_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: text("tenant_id").notNull(),
+  label: text("label"),
+  caseCardId: text("case_card_id").notNull(),
+  solver: text("solver").notNull(),
+  executionMode: text("execution_mode").notNull(),
+  status: text("status").default("queued").notNull(),
+  currentStage: text("current_stage"),
+  specJson: jsonb("spec_json").notNull(),
+  evidenceJson: jsonb("evidence_json").default([]).notNull(),
+  summaryJson: jsonb("summary_json"),
+  artifactsJson: jsonb("artifacts_json").default([]).notNull(),
+  errorLog: text("error_log"),
+  celeryTaskId: text("celery_task_id"),
+  artifactPrefix: text("artifact_prefix").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => [
+  index("simulation_runs_tenant_created_idx").on(table.tenantId, table.createdAt),
 ]);

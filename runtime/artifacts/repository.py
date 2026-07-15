@@ -11,6 +11,27 @@ class ArtifactRepository:
     else:
         backend = LocalFilesystemBackend()
 
+    @classmethod
+    def save_object(
+        cls,
+        object_name: str,
+        data: bytes,
+        content_type: str = "application/octet-stream",
+    ) -> None:
+        cls.backend.save_object(object_name, data, content_type)
+
+    @classmethod
+    def load_object(cls, object_name: str) -> bytes:
+        return cls.backend.load_object(object_name)
+
+    @classmethod
+    def object_exists(cls, object_name: str) -> bool:
+        return cls.backend.object_exists(object_name)
+
+    @classmethod
+    def list_objects(cls, prefix: str = "", limit: int = 200) -> list[dict]:
+        return cls.backend.list_objects(prefix=prefix, limit=limit)
+
     # --------------------------------------------------
     # Raw
     # --------------------------------------------------

@@ -140,7 +140,9 @@ registry = PluginRegistry()
 registry.register(PluginSpec("http", "downloader", "HTTP Downloader", "1.0.0", "plugins.downloader.default:DefaultDownloaderPlugin", ("url",), default=True))
 registry.register(PluginSpec("local-file", "downloader", "Local File", "1.0.0", "plugins.downloader.local_file:LocalFileDownloaderPlugin", ("pdf", "office", "html", "markdown", "text")))
 registry.register(PluginSpec("docling", "parser", "Docling Parser", "1.0.0", "plugins.parser.docling:DoclingParserPlugin", ("html", "pdf", "office", "ocr"), default=True))
+registry.register(PluginSpec("plain-text", "parser", "Engineering Text Parser", "1.0.0", "plugins.parser.plain_text:PlainTextParserPlugin", ("source-code", "solver-input", "csv", "json", "yaml")))
 registry.register(PluginSpec("docling-hybrid", "chunker", "Docling Hybrid Chunker", "1.0.0", "plugins.chunker.hybrid:HybridChunkerPlugin", ("structure-aware",), default=True))
+registry.register(PluginSpec("text-window", "chunker", "Engineering Text Window", "1.0.0", "plugins.chunker.text_window:TextWindowChunkerPlugin", ("plain-text", "overlap")))
 registry.register(PluginSpec(
     "sentence-transformers",
     "embedding",

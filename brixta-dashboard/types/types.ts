@@ -101,3 +101,62 @@ export interface SourceDefinition {
 export interface SourcesResponse {
   sources: SourceDefinition[];
 }
+
+export interface SimulationCaseCard {
+  id: string;
+  name: string;
+  description: string;
+  pack: string;
+  version: string;
+  solver: string;
+  analysis_type: string;
+  execution_modes: ("preview" | "solver")[];
+  outputs: string[];
+  limitations: string[];
+}
+
+export interface SimulationEvidence {
+  knowledge_base_id: string;
+  knowledge_base_name: string;
+  result_id: string;
+  title: string;
+  score: number;
+  snippet: string;
+  url: string;
+}
+
+export interface SimulationArtifact {
+  name: string;
+  object_name: string;
+  size: number;
+  content_type: string;
+}
+
+export interface SimulationRun {
+  id: string;
+  tenant_id: string;
+  label?: string;
+  case_card_id: string;
+  solver: string;
+  execution_mode: "preview" | "solver";
+  status: string;
+  current_stage: string;
+  spec: { parameters: Record<string, number>; validation_warnings?: string[] };
+  evidence: SimulationEvidence[];
+  summary?: Record<string, unknown>;
+  artifacts: SimulationArtifact[];
+  error?: string;
+  created_at?: string;
+  completed_at?: string;
+  terminal: boolean;
+}
+
+export interface SimulationPreflight {
+  valid: boolean;
+  case_card: SimulationCaseCard;
+  normalized_parameters: Record<string, number>;
+  analytical_reference: Record<string, number | string | null>;
+  evidence: SimulationEvidence[];
+  warnings: string[];
+  compiled_files: string[];
+}

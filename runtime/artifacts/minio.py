@@ -21,6 +21,54 @@ class MinIOBackend(ArtifactBackend):
         if not self.client.bucket_exists(self.bucket):
             self.client.make_bucket(self.bucket)
 
+    def save_object(
+        self,
+        object_name: str,
+        data: bytes,
+        content_type: str = "application/octet-stream",
+    ) -> None:
+        self._ensure_bucket()
+        self.client.put_object(
+            self.bucket,
+            object_name,
+            BytesIO(data),
+            length=len(data),
+            content_type=content_type,
+        )
+
+    def load_object(self, object_name: str) -> bytes:
+        response = self.client.get_object(self.bucket, object_name)
+        try:
+            return response.read()
+        finally:
+            response.close()
+            response.release_conn()
+
+    def object_exists(self, object_name: str) -> bool:
+        try:
+            self.client.stat_object(self.bucket, object_name)
+            return True
+        except S3Error:
+            return False
+
+    def list_objects(self, prefix: str = "", limit: int = 200) -> list[dict]:
+        if not self.client.bucket_exists(self.bucket):
+            return []
+        result = []
+        for item in self.client.list_objects(self.bucket, prefix=prefix, recursive=True):
+            result.append(
+                {
+                    "name": item.object_name,
+                    "size": item.size,
+                    "last_modified": (
+                        item.last_modified.isoformat() if item.last_modified else None
+                    ),
+                }
+            )
+            if len(result) >= limit:
+                break
+        return result
+
     def save_raw(
         self,
         job_id: str,
@@ -291,11 +339,4 @@ class MinIOBackend(ArtifactBackend):
         }
 
     def objects(self, prefix: str = "", limit: int = 200) -> list[dict]:
-        if not self.client.bucket_exists(self.bucket):
-            return []
-        result = []
-        for item in self.client.list_objects(self.bucket, prefix=prefix, recursive=True):
-            result.append({"name": item.object_name, "size": item.size, "last_modified": item.last_modified.isoformat() if item.last_modified else None})
-            if len(result) >= limit:
-                break
-        return result
+        return self.list_objects(prefix=prefix, limit=limit)

@@ -53,7 +53,7 @@ This README describes the repository as it exists now. Labels have precise meani
 | Dashboard | Implemented prototype | Operational pages exist. Authentication and authorization are not enabled. Do not expose Docker controls or tenant APIs publicly. |
 | CalculiX simulation | Implemented preview + solver path | Deterministic structural coupon pack. Solver mode requires the dedicated worker image. |
 | OpenFOAM simulation | Implemented preview + solver path | Deterministic channel-flow case compiler. JSON is compiled into an OpenFOAM case; OpenFOAM does not open the JSON directly. |
-| Kubernetes manifests | Deployment skeleton | Useful foundation, not a finished secure production platform. Several gaps are listed in [Production readiness gates](#production-readiness-gates). |
+| Kubernetes manifests | Deployment skeleton | Useful foundation, not a finished secure production platform. Several gaps are listed in [Production readiness gates](../Downloads/README(2).md#production-readiness-gates). |
 
 ### Production readiness gates
 
@@ -76,36 +76,37 @@ Do not call the current checkout production-ready until these are addressed:
 
 ## Table of contents
 
-- [Product model](#product-model)
-- [System architecture](#system-architecture)
-- [Repository map](#repository-map)
-- [Requirements](#requirements)
-- [Security first](#security-first)
-- [Environment configuration](#environment-configuration)
-- [Local installation](#local-installation)
-- [Starting the complete local stack](#starting-the-complete-local-stack)
-- [Ingestion and knowledge lifecycle](#ingestion-and-knowledge-lifecycle)
-- [Plugin system](#plugin-system)
-- [Sources, crawling, and schedules](#sources-crawling-and-schedules)
-- [Celery runtime, retries, and recovery](#celery-runtime-retries-and-recovery)
-- [PostgreSQL, Neon, and pgvector](#postgresql-neon-and-pgvector)
-- [Artifacts and MinIO](#artifacts-and-minio)
-- [API reference](#api-reference)
-- [Dashboard](#dashboard)
-- [MCP and AI-client integration](#mcp-and-ai-client-integration)
-- [CLI reference](#cli-reference)
-- [Simulation Lab](#simulation-lab)
-- [Docker images](#docker-images)
-- [Kubernetes deployment](#kubernetes-deployment)
-- [Infisical and `start.sh`](#infisical-and-startsh)
-- [GitHub Actions and releases](#github-actions-and-releases)
-- [Testing](#testing)
-- [Troubleshooting](#troubleshooting)
-- [How to extend or remove components](#how-to-extend-or-remove-components)
-- [Strengths, weaknesses, and roadmap](#strengths-weaknesses-and-roadmap)
-- [When to split the monorepo](#when-to-split-the-monorepo)
-- [Contributing](#contributing)
-- [Glossary](#glossary)
+- [Product model](../Downloads/README(2).md#product-model)
+- [System architecture](../Downloads/README(2).md#system-architecture)
+- [Repository map](../Downloads/README(2).md#repository-map)
+- [Requirements](../Downloads/README(2).md#requirements)
+- [BRIXTA Python package](../Downloads/README(2).md#brixta-python-package)
+- [Security first](../Downloads/README(2).md#security-first)
+- [Environment configuration](../Downloads/README(2).md#environment-configuration)
+- [Local installation](../Downloads/README(2).md#local-installation)
+- [Starting the complete local stack](../Downloads/README(2).md#starting-the-complete-local-stack)
+- [Ingestion and knowledge lifecycle](../Downloads/README(2).md#ingestion-and-knowledge-lifecycle)
+- [Plugin system](../Downloads/README(2).md#plugin-system)
+- [Sources, crawling, and schedules](../Downloads/README(2).md#sources-crawling-and-schedules)
+- [Celery runtime, retries, and recovery](../Downloads/README(2).md#celery-runtime-retries-and-recovery)
+- [PostgreSQL, Neon, and pgvector](../Downloads/README(2).md#postgresql-neon-and-pgvector)
+- [Artifacts and MinIO](../Downloads/README(2).md#artifacts-and-minio)
+- [API reference](../Downloads/README(2).md#api-reference)
+- [Dashboard](../Downloads/README(2).md#dashboard)
+- [MCP and AI-client integration](../Downloads/README(2).md#mcp-and-ai-client-integration)
+- [CLI reference](../Downloads/README(2).md#cli-reference)
+- [Simulation Lab](../Downloads/README(2).md#simulation-lab)
+- [Docker images](../Downloads/README(2).md#docker-images)
+- [Kubernetes deployment](../Downloads/README(2).md#kubernetes-deployment)
+- [Infisical and `start.sh`](../Downloads/README(2).md#infisical-and-startsh)
+- [GitHub Actions and releases](../Downloads/README(2).md#github-actions-and-releases)
+- [Testing](../Downloads/README(2).md#testing)
+- [Troubleshooting](../Downloads/README(2).md#troubleshooting)
+- [How to extend or remove components](../Downloads/README(2).md#how-to-extend-or-remove-components)
+- [Strengths, weaknesses, and roadmap](../Downloads/README(2).md#strengths-weaknesses-and-roadmap)
+- [When to split the monorepo](../Downloads/README(2).md#when-to-split-the-monorepo)
+- [Contributing](../Downloads/README(2).md#contributing)
+- [Glossary](../Downloads/README(2).md#glossary)
 
 ---
 
@@ -274,6 +275,373 @@ Generated/runtime files that should not be committed or shipped include `.env`, 
 | `requirements.txt` | Historical only | A platform-specific freeze that has previously produced incompatible NumPy/Transformers/Docling combinations. Do not use as the canonical clean install. |
 
 `pyproject.toml` installs the `brixta` command and local packages, but intentionally does not declare the heavyweight runtime dependency groups. Install the appropriate requirements first, then install the project editable.
+
+---
+
+## BRIXTA Python package
+
+### What “the BRIXTA package” means
+
+This repository contains a Python distribution named **`brixta`**, currently version **`2.1.0`**, defined in `pyproject.toml`:
+
+```toml
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "brixta"
+version = "2.1.0"
+description = "Integration-first AI ingestion, retrieval, and MCP runtime"
+requires-python = ">=3.11,<3.14"
+
+[project.scripts]
+brixta = "brixta_cli.main:main"
+```
+
+The distribution name used by `pip` is `brixta`. Installing it creates the `brixta` terminal command. That command calls `brixta_cli.main:main`.
+
+The distribution currently discovers and packages these Python namespaces:
+
+```text
+api*
+brixta_cli*
+brixta_mcp*
+brixta_sdk*
+core*
+plugins*
+runtime*
+```
+
+That makes the current wheel an **application/runtime distribution**, not a tiny standalone SDK. It contains the API, CLI, shared MCP server, plugin contracts, built-in plugins, runtime services and tasks.
+
+It does **not** contain or install:
+
+- the Next.js dashboard and its npm dependencies;
+- Docker/Compose as a runtime;
+- Kubernetes or an ingress controller;
+- Redis, PostgreSQL, pgvector, MinIO, OpenFOAM or CalculiX servers/binaries;
+- `cloudflared`;
+- environment variables, database tables or Kubernetes Secrets;
+- Python third-party dependencies, because the present `pyproject.toml` has no `dependencies` or optional extras.
+
+Installing the package therefore makes BRIXTA's Python code and CLI available, but it does not make a complete platform operational by itself.
+
+### Current package maturity
+
+| Capability | Current state |
+|---|---|
+| Editable developer install | Works with `python -m pip install -e .` after installing a requirements profile. |
+| Local wheel/sdist build | Supported by setuptools through `python -m build`. |
+| CLI entry point | Implemented as `brixta = brixta_cli.main:main`. |
+| Python version guard | Implemented: Python 3.11–3.13. |
+| Dependency metadata/extras | **Not implemented.** Requirements must be installed separately. |
+| Public PyPI release automation | **Not implemented.** Do not assume `pip install brixta` downloads this project today. |
+| GitHub Release automation | **Not implemented.** Current CI only builds selected container images. |
+| Signed wheel/provenance | **Not implemented.** Add before trusted public distribution. |
+| Separate lightweight SDK distribution | **Not implemented.** `brixta_sdk` is bundled inside the full distribution. |
+
+### Installation choices
+
+#### Choice A — contributor/developer install
+
+Use this when editing the repository. Source changes are visible immediately without rebuilding the wheel:
+
+```bash
+python3.11 -m venv Resea
+source Resea/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements-workers.txt -r requirements-rag.txt
+python -m pip install -e .
+```
+
+The `-e` means editable. `pip` writes distribution metadata and a source-path link into the active virtual environment. It does not copy the whole source tree into `site-packages`.
+
+Verify:
+
+```bash
+which python
+which brixta
+python -c "from importlib.metadata import version; print(version('brixta'))"
+python -c "import api, brixta_cli, brixta_mcp, brixta_sdk, core, plugins, runtime; print('imports ok')"
+brixta --help
+brixta doctor --skip-semantic
+```
+
+#### Choice B — install a locally built release wheel
+
+Use this to test exactly what another machine receives:
+
+```bash
+source Resea/bin/activate
+python -m pip install --upgrade build
+python -m build
+ls -lh dist/
+```
+
+Create a clean environment and install the required runtime profile plus the wheel:
+
+```bash
+python3.11 -m venv /tmp/brixta-wheel-test
+source /tmp/brixta-wheel-test/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r /absolute/path/to/requirements-rag.txt
+python -m pip install /absolute/path/to/dist/brixta-2.1.0-py3-none-any.whl
+brixta --help
+brixta doctor --skip-semantic
+```
+
+For a full document worker on that machine, install `requirements-workers.txt` too. For an API/light service, install `requirements-api.txt`. Requirements are separate in the current packaging design.
+
+#### Choice C — install from a GitHub checkout or tag
+
+The reliable current path is to clone a reviewed tag, install a dependency profile, and install the checkout:
+
+```bash
+git clone https://github.com/BRIXTAOrg/BrReseaRepo.git
+cd BrReseaRepo
+git checkout v2.1.0   # only after this tag actually exists
+python3.11 -m venv Resea
+source Resea/bin/activate
+python -m pip install -r requirements-workers.txt -r requirements-rag.txt
+python -m pip install .
+```
+
+`pip install .` performs a normal non-editable install. Use `pip install -e .` only for development.
+
+Direct `pip install "brixta @ git+https://..."` is not the canonical current installation because the Git dependency cannot select the separate requirements profiles automatically. It becomes practical after dependencies/extras are declared in `pyproject.toml`.
+
+#### Choice D — future PyPI install
+
+Once a verified package is published to PyPI, the intended commands can become:
+
+```bash
+python3.11 -m venv Resea
+source Resea/bin/activate
+python -m pip install "brixta[rag,workers]==2.1.0"
+```
+
+That command is a **target design**, not the current repository behavior: optional extras are not declared and this README does not claim that version exists on PyPI.
+
+### Which dependency profile should a machine install?
+
+| Machine/process | Requirements today | BRIXTA install |
+|---|---|---|
+| CLI with semantic doctor/search and MCP | `requirements-rag.txt` | wheel or `pip install -e .` |
+| FastAPI gateway with retrieval | `requirements-rag.txt` | wheel/source |
+| Lightweight API without semantic retrieval | `requirements-api.txt` | wheel/source |
+| downloader/parser/chunker/embedding worker | `requirements-workers.txt` | wheel/source |
+| CalculiX worker | `requirements-api.txt` + OS `ccx` | wheel/source or dedicated image |
+| OpenFOAM worker | `requirements-api.txt` + OpenFOAM 13 | wheel/source or dedicated image |
+| Dashboard | npm dependencies in `brixta-dashboard/` | Python wheel is not enough |
+
+Because `requirements-rag.txt` and `requirements-workers.txt` both include API-level libraries, installing both on a developer machine is convenient but produces a large environment. Production images should install only what each process needs.
+
+### Package contents and inspection
+
+Before publishing, inspect both source distribution and wheel:
+
+```bash
+python -m build
+tar -tzf dist/brixta-2.1.0.tar.gz | sort
+python - <<'PY'
+from pathlib import Path
+from zipfile import ZipFile
+
+wheel = next(Path("dist").glob("brixta-*.whl"))
+with ZipFile(wheel) as archive:
+    for name in sorted(archive.namelist()):
+        print(name)
+PY
+```
+
+Confirm that required Python modules are present and that none of these are present:
+
+```text
+.env
+.brixta/
+.webui_secret_key
+Resea/
+node_modules/
+.next/
+storage/uploads/
+celerybeat-schedule.db
+credentials, tokens, logs or databases
+```
+
+The generated `brixta.egg-info/` directory in the repository is build output. Remove it from source control and let build/install tools regenerate it.
+
+### Package data warning
+
+Setuptools package discovery includes Python packages/modules. If a new plugin needs non-Python templates, schemas, SQL, static files or binaries, merely placing them under a package directory may not put them in the wheel. Declare them explicitly through `package-data`, `include-package-data` plus a manifest, or move them to an external artifact/image with a well-defined loader. Add a wheel-content test.
+
+Dockerfiles, Kubernetes YAML, dashboard assets, requirements files and shell scripts are repository/deployment assets. Do not assume they are available through an installed wheel unless packaging metadata explicitly includes them.
+
+### Versioning policy
+
+Use semantic versioning for the Python distribution:
+
+- **PATCH**: compatible bug/documentation fixes.
+- **MINOR**: backward-compatible features, plugins, tools or Case Cards.
+- **MAJOR**: incompatible CLI/API/SDK/plugin/task/MCP contract changes.
+
+Treat these as versioned public contracts even before a public PyPI release:
+
+- `brixta` CLI commands/options/output used by automation;
+- `brixta_sdk` interfaces and `PipelineContext` serialization;
+- plugin IDs/stages/model profiles;
+- Celery task names and queue envelopes;
+- REST paths/request/response schemas;
+- MCP tool names/input/output schemas;
+- Case Card IDs and simulation artifact manifests;
+- database migrations and persisted `context_json`.
+
+Currently the version is written in `pyproject.toml`. Avoid copying a second hardcoded version into Python modules. Code that needs its installed version should use:
+
+```python
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("brixta")
+except PackageNotFoundError:
+    __version__ = "0+uninstalled"
+```
+
+### Add a new Python module/package
+
+1. Put it under an existing included namespace when it belongs there.
+2. If adding a new top-level namespace, update `[tool.setuptools.packages.find].include`.
+3. Add `__init__.py` files where the chosen package layout requires them.
+4. Add non-Python package-data rules when applicable.
+5. Add its dependency to the correct requirements profile; later add it to the matching optional extra.
+6. Build a wheel and inspect it.
+7. Install the wheel into a clean environment and import/run it.
+8. Document compatibility and upgrade/removal behavior.
+
+Renaming a Python package or moving a persisted plugin import path is a compatibility change. Keep a transitional import/re-export when external users or stored contexts may reference the old path.
+
+### Add or change the `brixta` CLI
+
+Commands are parsed in `brixta_cli/main.py`. To add one:
+
+1. add an argparse command/subcommand with clear help;
+2. keep the entry function lightweight and lazily import heavy services;
+3. return integer exit codes (`0` success, nonzero failure);
+4. print actionable errors without secrets;
+5. add parser/command/process-cleanup tests;
+6. update this README and shell completion/automation contracts if added later.
+
+The console entry point itself normally remains:
+
+```toml
+[project.scripts]
+brixta = "brixta_cli.main:main"
+```
+
+Changing that target without a compatibility shim breaks every installed `brixta` command after upgrade.
+
+### Upgrade, downgrade and uninstall
+
+Editable development update after pulling code:
+
+```bash
+source Resea/bin/activate
+git pull --ff-only
+python -m pip install -r requirements-workers.txt -r requirements-rag.txt
+python -m pip install -e .
+brixta doctor
+```
+
+Wheel upgrade:
+
+```bash
+python -m pip install --upgrade ./dist/brixta-NEW_VERSION-py3-none-any.whl
+```
+
+Pin/downgrade only when database and persisted contracts remain compatible:
+
+```bash
+python -m pip install --force-reinstall ./dist/brixta-OLD_VERSION-py3-none-any.whl
+```
+
+Application-code rollback does not undo database migrations, change Redis messages already queued, restore deleted plugins, or convert existing embeddings. Plan those separately.
+
+Stop locally managed processes before uninstalling:
+
+```bash
+brixta disconnect
+python -m pip uninstall brixta
+```
+
+Uninstalling the wheel does not delete PostgreSQL data, MinIO objects, Redis state, the dashboard, Docker containers, Kubernetes resources, `.env`, or local control-plane files. Delete infrastructure/data only through an explicit backup/retention-aware operator procedure.
+
+### Recommended dependency extras design
+
+Before public package distribution, move dependency intent into `pyproject.toml` while keeping lock/constraints for reproducible images. A future shape could be:
+
+```toml
+[project]
+dependencies = [
+  "pydantic>=2,<3",
+  "pydantic-settings>=2,<3",
+]
+
+[project.optional-dependencies]
+api = ["fastapi", "uvicorn", "celery[redis]", "psycopg[binary]", "pgvector", "minio"]
+rag = ["sentence-transformers", "einops", "fastmcp"]
+workers = ["docling", "sentence-transformers"]
+dev = ["build", "twine", "pytest", "ruff", "mypy"]
+all = ["brixta[api,rag,workers]"]
+```
+
+Do not copy that example unreviewed: select tested version bounds, avoid self-referential extras if the backend/tooling rejects them, and generate constraints/locks for Linux/macOS/Python support. The goal is for an end user to install `brixta[rag]` without manually discovering requirements files.
+
+### Why `pipx` is not the default yet
+
+`pipx` is excellent for isolated CLI applications, but the current package does not declare its runtime dependencies. `pipx install .` may create the command while leaving imports such as FastMCP, psycopg, Celery or Sentence Transformers unavailable. Make `pipx install 'brixta[rag]'` a supported path only after extras and package tests exist.
+
+### Release the package to GitHub
+
+The detailed build checks appear in [GitHub Actions and releases](../Downloads/README(2).md#github-actions-and-releases). The short operator sequence is:
+
+```bash
+# clean checkout and supported Python
+python3.11 -m venv Resea-release
+source Resea-release/bin/activate
+python -m pip install --upgrade pip build twine
+python -m build
+python -m twine check dist/*
+
+# after tests and version review
+git tag -s v2.1.0 -m "BRIXTA 2.1.0"
+git push origin v2.1.0
+```
+
+Create a GitHub Release for the tag and attach the wheel, source archive, checksums, SBOM and release notes. Prefer a protected GitHub Actions release workflow with artifact attestations over building final artifacts on a developer laptop.
+
+### Publish to PyPI later
+
+1. Confirm the distribution name is owned/available and project metadata is complete.
+2. Add `readme`, license, authors/maintainers, project URLs, classifiers and dependency extras to `pyproject.toml`.
+3. Add tests for wheel contents and clean installation.
+4. Configure PyPI Trusted Publishing for a protected GitHub environment.
+5. Publish to TestPyPI and install/test from TestPyPI.
+6. Promote the exact tested artifacts to PyPI.
+7. Never embed service secrets or publish environment-specific configuration.
+
+Until that exists, GitHub releases and container images are the controlled distribution paths.
+
+### Future package split
+
+The current full distribution is convenient during rapid development. As external plugin authors appear, split by contract rather than by folder size:
+
+- `brixta-sdk`: lightweight interfaces, context models and simulation contracts;
+- `brixta-cli`: operator/client CLI depending on explicit extras;
+- `brixta-mcp`: shared gateway service;
+- `brixta-core`: API/runtime/control-plane;
+- independently released plugin/solver packs.
+
+Use separate distribution names, semantic versions and compatibility ranges. Do not split until automated cross-package compatibility tests and a deprecation policy exist.
 
 ---
 
@@ -2304,7 +2672,7 @@ A change is done only when:
 
 ### Production
 
-- [ ] All [Production readiness gates](#production-readiness-gates) closed.
+- [ ] All [Production readiness gates](../Downloads/README(2).md#production-readiness-gates) closed.
 - [ ] Fresh and upgrade database migrations pass.
 - [ ] OIDC/RBAC/tenant enforcement/RLS tested.
 - [ ] Stable TLS API/dashboard/MCP domains configured.

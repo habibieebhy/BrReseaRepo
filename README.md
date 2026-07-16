@@ -389,7 +389,7 @@ sudo killall -HUP mDNSResponder
 Start the scheduler in another terminal when using cron sources:
 
 ```bash
-python -m celery -A runtime.celery_app.celery beat --loglevel=info
+python -m celery -A runtime.celery_app.celery beat --loglevel=inf
 
 ```
 

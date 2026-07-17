@@ -2,6 +2,7 @@ apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: vpa-embeddings
+  namespace: brixta
 spec:
   targetRef:
     apiVersion: apps/v1

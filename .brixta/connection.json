@@ -1,23 +1,13 @@
 {
   "auth_mode": "oauth-local",
-  "connected_at": "2026-07-16T02:01:33.842528+00:00",
-  "last_error": null,
-  "mcp_pid": 92345,
-  "mcp_url": "https://associate-cakes-job-mega.trycloudflare.com/mcp",
+  "last_error": "[Errno 8] nodename nor servname provided, or not known",
+  "mcp_pid": 38447,
+  "mcp_url": "https://abraham-kerry-ooo-application.trycloudflare.com/mcp",
   "mode": "local-chatgpt",
-  "started_at": "2026-07-16T02:00:27.021845+00:00",
-  "status": "online",
-  "tenant_id": "nextjsDoc",
-  "tunnel_pid": 92324,
-  "updated_at": "2026-07-16T02:01:33.843021+00:00",
-  "verification_attempt": 11,
-  "verified_tools": [
-    "brixta_get_chunk",
-    "brixta_get_simulation_report",
-    "brixta_list_knowledge_bases",
-    "brixta_list_simulation_runs",
-    "brixta_list_sources",
-    "brixta_search",
-    "brixta_sync_source"
-  ]
+  "started_at": "2026-07-17T08:02:24.150934+00:00",
+  "status": "starting",
+  "tenant_id": "demo",
+  "tunnel_pid": 38428,
+  "updated_at": "2026-07-17T08:02:57.141448+00:00",
+  "verification_attempt": 8
 }

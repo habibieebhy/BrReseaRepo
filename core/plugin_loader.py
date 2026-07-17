@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from importlib import import_module
+from importlib.metadata import entry_points
 from threading import Lock
-from typing import Any
+from typing import Any, Iterable, Mapping
 
 from core.exceptions import ValidationError
 
@@ -135,6 +136,47 @@ class PluginRegistry:
         raise ValidationError(f"Embedding plugin '{plugin_id}' declares no model profiles.")
 
 
+def _model_spec(value: ModelSpec | Mapping[str, Any]) -> ModelSpec:
+    if isinstance(value, ModelSpec):
+        return value
+    payload = dict(value)
+    return ModelSpec(**payload)
+
+
+def _plugin_spec(value: PluginSpec | Mapping[str, Any]) -> PluginSpec:
+    if isinstance(value, PluginSpec):
+        return value
+    payload = dict(value)
+    payload["capabilities"] = tuple(payload.get("capabilities", ()))
+    payload["models"] = tuple(_model_spec(model) for model in payload.get("models", ()))
+    return PluginSpec(**payload)
+
+
+def discover_entrypoint_plugins(target: PluginRegistry) -> None:
+    """Register plugins supplied by installed Python distributions.
+
+    A distribution exposes one or more entry points in the ``brixta.plugins``
+    group.  Each entry point returns a PluginSpec, a compatible mapping, or an
+    iterable of either.  Discovery happens once at process startup, so API and
+    worker images must contain the exact same pinned plugin distributions.
+    """
+
+    for entrypoint in entry_points(group="brixta.plugins"):
+        loaded = entrypoint.load()
+        supplied = loaded() if callable(loaded) and not isinstance(loaded, PluginSpec) else loaded
+        values: Iterable[PluginSpec | Mapping[str, Any]]
+        if isinstance(supplied, (PluginSpec, Mapping)):
+            values = (supplied,)
+        elif isinstance(supplied, Iterable) and not isinstance(supplied, (str, bytes)):
+            values = supplied
+        else:
+            raise ValidationError(
+                f"Entry point '{entrypoint.name}' did not return BRIXTA plugin metadata."
+            )
+        for value in values:
+            target.register(_plugin_spec(value))
+
+
 registry = PluginRegistry()
 
 registry.register(PluginSpec("http", "downloader", "HTTP Downloader", "1.0.0", "plugins.downloader.default:DefaultDownloaderPlugin", ("url",), default=True))
@@ -166,6 +208,7 @@ registry.register(PluginSpec(
     default=True,
 ))
 registry.register(PluginSpec("pgvector", "storage", "PostgreSQL + pgvector", "1.0.0", "plugins.storage.pgvector:PgVectorStoragePlugin", ("vector", "metadata"), default=True))
+discover_entrypoint_plugins(registry)
 
 
 class PluginLoader:

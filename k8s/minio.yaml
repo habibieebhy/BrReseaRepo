@@ -2,8 +2,13 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: minio
+  namespace: brixta
+  labels:
+    app: minio
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: minio
@@ -12,46 +17,82 @@ spec:
       labels:
         app: minio
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
-      - name: minio
-        image: quay.io/minio/minio:latest
-        args:
-          - server
-          - /data
-          - --console-address
-          - ":9001"
-        env:
-        - name: MINIO_ROOT_USER
-          value: "minioadmin"
-        - name: MINIO_ROOT_PASSWORD
-          value: "minioadmin"
-        ports:
-        - containerPort: 9000
-          name: api
-        - containerPort: 9001
-          name: console
-        volumeMounts:
-        - name: minio-storage
-          mountPath: /data
+        - name: minio
+          image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: MINIO_ROOT_PASSWORD
+          envFrom:
+            - secretRef:
+                name: minio-oidc-secrets
+                optional: true
+          ports:
+            - name: api
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: api
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
       volumes:
-      - name: minio-storage
-        persistentVolumeClaim:
-          claimName: storage-pvc
+        - name: data
+          persistentVolumeClaim:
+            claimName: minio-data-pvc
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: minio-service
+  namespace: brixta
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: minio
   ports:
     - name: api
       port: 9000
-      targetPort: 9000
-      nodePort: 32000
+      targetPort: api
     - name: console
       port: 9001
-      targetPort: 9001
-      nodePort: 32001
+      targetPort: console

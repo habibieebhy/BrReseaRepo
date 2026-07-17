@@ -1,39 +1,48 @@
 FROM ubuntu:24.04
 
+ARG BRIXTA_VERSION=2.1.0
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.title="BRIXTA OpenFOAM Worker" \
+      org.opencontainers.image.version="${BRIXTA_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}"
+
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    SIMULATION_TIMEOUT_SECONDS=3600
+    SIMULATION_TIMEOUT_SECONDS=3600 \
+    BRIXTA_ENVIRONMENT=production
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        ca-certificates python3 python3-venv software-properties-common wget \
+      ca-certificates git python3 python3-venv software-properties-common wget \
     && wget -qO /etc/apt/trusted.gpg.d/openfoam.asc https://dl.openfoam.org/gpg.key \
-    && add-apt-repository "http://dl.openfoam.org/ubuntu main" \
+    && add-apt-repository "https://dl.openfoam.org/ubuntu main" \
     && apt-get update \
     && apt-get install -y --no-install-recommends openfoam13 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-
 RUN python3 -m venv /opt/brixta-venv
-ENV PATH=/opt/brixta-venv/bin:$PATH
+ENV PATH="/opt/brixta-venv/bin:$PATH"
 
-COPY requirements-api.txt .
-RUN pip install --upgrade pip && pip install -r requirements-api.txt
+COPY requirements-api.txt requirements-plugins.txt pyproject.toml README.md ./
+RUN python -m pip install --upgrade pip \
+    && python -m pip install -r requirements-api.txt -r requirements-plugins.txt
 
 COPY api/ ./api/
+COPY brixta_cli/ ./brixta_cli/
+COPY brixta_mcp/ ./brixta_mcp/
 COPY brixta_sdk/ ./brixta_sdk/
 COPY core/ ./core/
 COPY plugins/ ./plugins/
 COPY runtime/ ./runtime/
 
-RUN groupadd -r brixta \
-    && useradd -r -g brixta -d /app brixta \
+RUN python -m pip install --no-deps . \
+    && groupadd --system --gid 10001 brixta \
+    && useradd --system --uid 10001 --gid brixta --home-dir /app brixta \
     && mkdir -p /app/storage \
     && chown -R brixta:brixta /app
 
-USER brixta
-
-CMD ["bash", "-lc", ". /opt/openfoam13/etc/bashrc && exec python -m celery -A runtime.celery_app.celery worker --loglevel=info --queues=simulations.openfoam --concurrency=1"]
+USER 10001:10001
+CMD ["bash", "-lc", ". /opt/openfoam13/etc/bashrc && exec python -m celery -A runtime.celery_app.celery worker --loglevel=info --queues=simulations.openfoam --concurrency=1 --hostname=openfoam@%h"]

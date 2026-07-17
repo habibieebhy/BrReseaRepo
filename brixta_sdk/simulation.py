@@ -166,7 +166,7 @@ class OpenFoamChannelParameters(BaseModel):
 class SimulationRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    tenant_id: str = Field(min_length=1, max_length=200)
+    tenant_id: str | None = Field(default=None, min_length=1, max_length=200)
     case_card_id: str = Field(default="structural_coupon_tension_v1")
     execution_mode: Literal["preview", "solver"] = "preview"
     parameters: dict[str, Any]
@@ -178,7 +178,7 @@ class SimulationRunRequest(BaseModel):
 class SimulationPreflightRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    tenant_id: str = Field(min_length=1, max_length=200)
+    tenant_id: str | None = Field(default=None, min_length=1, max_length=200)
     case_card_id: str = Field(default="structural_coupon_tension_v1")
     parameters: dict[str, Any]
     knowledge_base_ids: list[str] = Field(default_factory=list, max_length=20)

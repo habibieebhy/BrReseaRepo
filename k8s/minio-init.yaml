@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-init
+  namespace: brixta
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      containers:
+        - name: minio-client
+          image: quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              until mc alias set brixta http://minio-service:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do sleep 2; done
+              mc mb --ignore-existing "brixta/$MINIO_BUCKET"
+              mc admin user add brixta "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" || true
+              cat >/tmp/brixta-policy.json <<EOF
+              {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Action": ["s3:GetBucketLocation", "s3:ListBucket", "s3:ListBucketMultipartUploads"],
+                    "Resource": ["arn:aws:s3:::$MINIO_BUCKET"]
+                  },
+                  {
+                    "Effect": "Allow",
+                    "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"],
+                    "Resource": ["arn:aws:s3:::$MINIO_BUCKET/*"]
+                  }
+                ]
+              }
+              EOF
+              mc admin policy create brixta brixta-application /tmp/brixta-policy.json \
+                || mc admin policy info brixta brixta-application >/dev/null
+              mc admin policy attach brixta brixta-application --user "$MINIO_ACCESS_KEY"
+          envFrom:
+            - secretRef:
+                name: app-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault

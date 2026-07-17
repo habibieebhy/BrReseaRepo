@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: worker-simulations-calculix
+  namespace: brixta
   labels:
     app: worker-simulations-calculix
 spec:
@@ -14,29 +15,44 @@ spec:
       labels:
         app: worker-simulations-calculix
     spec:
-      terminationGracePeriodSeconds: 60
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 90
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: celery-simulations
-          image: your-registry/brixta-simulations:2.2.0
+          image: ghcr.io/brixtaorg/brresearepo-simulations:2.1.0
           imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef:
                 name: app-secrets
           env:
-            - name: REDIS_URL
-              value: redis://redis-service:6379/0
+            - name: BRIXTA_ENVIRONMENT
+              value: production
             - name: CALCULIX_EXECUTABLE
               value: ccx
             - name: SIMULATION_TIMEOUT_SECONDS
               value: "1800"
           resources:
             requests:
-              cpu: "500m"
+              cpu: 500m
               memory: 512Mi
             limits:
               cpu: "2"
               memory: 2Gi
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
-            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /app/storage
+      volumes:
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: brixta-shared-pvc

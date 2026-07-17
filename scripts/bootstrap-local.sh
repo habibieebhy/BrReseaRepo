@@ -1,6 +1,12 @@
 #!/bin/sh
 set -eu
 
+PROFILE="${BRIXTA_LOCAL_PROFILE:-full}"
+case "$PROFILE" in
+  api|full) ;;
+  *) echo "BRIXTA_LOCAL_PROFILE must be 'api' or 'full'." >&2; exit 1 ;;
+esac
+
 if [ -n "${PYTHON_BIN:-}" ]; then
   CANDIDATES="$PYTHON_BIN"
 else
@@ -8,15 +14,15 @@ else
 fi
 
 PYTHON_BIN=""
-for CANDIDATE in $CANDIDATES; do
-  if command -v "$CANDIDATE" >/dev/null 2>&1; then
-    PYTHON_BIN="$CANDIDATE"
+for candidate in $CANDIDATES; do
+  if command -v "$candidate" >/dev/null 2>&1; then
+    PYTHON_BIN="$candidate"
     break
   fi
 done
 
 if [ -z "$PYTHON_BIN" ]; then
-  echo "BRIXTA needs Python 3.11, 3.12, or 3.13. Install one or set PYTHON_BIN explicitly." >&2
+  echo "BRIXTA needs Python 3.11, 3.12, or 3.13. Set PYTHON_BIN if necessary." >&2
   exit 1
 fi
 
@@ -31,28 +37,43 @@ if [ ! -d Resea ]; then
 fi
 
 Resea/bin/python -m pip install --upgrade pip
-Resea/bin/python -m pip install -r requirements.txt
+if [ "$PROFILE" = "full" ]; then
+  Resea/bin/python -m pip install \
+    -r requirements-workers.txt \
+    -r requirements-rag.txt \
+    -r requirements-plugins.txt
+else
+  Resea/bin/python -m pip install \
+    -r requirements-api.txt \
+    -r requirements-rag.txt \
+    -r requirements-plugins.txt
+fi
 Resea/bin/python -m pip install -e .
 
 if [ ! -f .env ]; then
   cp .env.example .env
-  echo "Created .env from .env.example"
+  echo "Created .env from .env.example; review its passwords before continuing."
 fi
 
 if command -v docker >/dev/null 2>&1; then
   docker compose up -d --wait postgres redis minio
-  docker compose up minio-init
+  docker compose run --rm minio-init
 else
-  echo "Docker was not found; start PostgreSQL/pgvector, Redis, and optional MinIO yourself."
+  echo "Docker was not found; start PostgreSQL/pgvector, Redis, and MinIO yourself."
 fi
 
 if command -v npm >/dev/null 2>&1; then
-  (cd infra && npm install && npm run db:migrate)
-  (cd brixta-dashboard && npm install)
+  (cd infra && npm ci && npm run db:migrate)
+  (cd brixta-dashboard && npm ci)
 else
-  echo "npm was not found; install Node.js before running the dashboard or migrations."
+  echo "npm was not found; install Node.js before running migrations or the dashboard."
 fi
 
 echo
-echo "BRIXTA setup complete. Activate it with: source Resea/bin/activate"
-echo "Then run: brixta doctor"
+echo "BRIXTA local setup is ready."
+echo "  source Resea/bin/activate"
+echo "  brixta doctor"
+echo "  python -m uvicorn api.main:app --reload"
+echo "  python -m celery -A runtime.celery_app.celery worker --loglevel=info"
+echo "  python -m celery -A runtime.celery_app.celery beat --loglevel=info"
+echo "  (cd brixta-dashboard && npm run dev)"

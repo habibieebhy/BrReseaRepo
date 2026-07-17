@@ -1,0 +1,39 @@
+name: Deploy BRIXTA to self-hosted Kubernetes
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Previously published immutable image tag (for example 2.1.0 or sha-abc1234)"
+        required: true
+      environment:
+        description: "GitHub Environment requiring deployment approval"
+        required: true
+        default: production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brixta-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Install a GitHub Actions runner on the server with kubectl access and the
+    # labels: self-hosted, linux, brixta-production.
+    runs-on: [self-hosted, linux, brixta-production]
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Confirm cluster access
+        run: kubectl cluster-info
+      - name: Deploy immutable images
+        env:
+          SECRETS_MODE: existing
+          BRIXTA_IMAGE_REGISTRY: ghcr.io/brixtaorg
+          BRIXTA_IMAGE_TAG: ${{ inputs.image_tag }}
+        run: ./start.sh
+      - name: Capture rollout state
+        if: always()
+        run: kubectl -n brixta get pods,deployments,services

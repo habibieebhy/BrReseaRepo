@@ -14,11 +14,13 @@ from api.sources import router as sources_router
 from runtime.settings import RuntimeSettingsRepository
 from runtime.jobs.repository import JobRepository
 from api.simulations import router as simulations_router
+from api.auth import ApiAuthMiddleware, CurrentPrincipal
+from core.config import BRIXTA_CORS_ORIGINS
 
 
 class IngestionRequest(BaseModel):
     source_url: HttpUrl
-    tenant_id: str = Field(min_length=1)
+    tenant_id: str | None = Field(default=None, min_length=1)
     plugins: dict[str, str] = Field(default_factory=dict)
     config: dict = Field(default_factory=dict)
 
@@ -26,11 +28,12 @@ class IngestionRequest(BaseModel):
 app = FastAPI(
     title="BRIXTA Core API",
     description="High-performance ingestion entry point.",
-    version="2.0.0",
+    version="2.1.0",
 )
+app.add_middleware(ApiAuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=list(BRIXTA_CORS_ORIGINS),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -56,9 +59,22 @@ async def health():
     }
 
 
+@app.get("/auth/me")
+async def auth_me(principal: CurrentPrincipal):
+    return {
+        "subject": principal.subject,
+        "email": principal.email,
+        "tenant_id": principal.tenant_id,
+        "roles": sorted(principal.roles),
+        "is_admin": principal.is_admin,
+        "authenticated": principal.authenticated,
+    }
+
+
 @app.post("/ingest", status_code=status.HTTP_202_ACCEPTED)
 async def ingest(
     request: IngestionRequest,
+    principal: CurrentPrincipal,
 ):
 
     # ----------------------------------------------------
@@ -67,7 +83,7 @@ async def ingest(
 
     context = PipelineContext(
         job_id=str(uuid.uuid4()),
-        tenant_id=request.tenant_id,
+        tenant_id=principal.tenant_for(request.tenant_id),
         source_type="url",
         source_target=str(request.source_url),
         plugins={**RuntimeSettingsRepository.get().get("default_plugins", {}), **request.plugins},
@@ -121,6 +137,7 @@ async def ingest(
 
 @app.post("/ingest/file", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_file(
+    principal: CurrentPrincipal,
     file: UploadFile = File(...),
     tenant_id: str = Form(...),
     parser: str = Form("docling"),
@@ -129,6 +146,7 @@ async def ingest_file(
     storage: str = Form("pgvector"),
     embedding_model: str = Form("nomic-ai/nomic-embed-text-v1.5"),
 ):
+    tenant_id = principal.tenant_for(tenant_id)
     suffix = Path(file.filename or "upload").suffix.lower()
     engineering_text = {
         ".csv", ".json", ".yaml", ".yml", ".xml", ".inp", ".dat",
@@ -199,7 +217,7 @@ async def ingest_file(
 
 
 @app.get("/plugins", status_code=status.HTTP_200_OK)
-async def list_plugins(stage: str | None = None):
+async def list_plugins(principal: CurrentPrincipal, stage: str | None = None):
     if stage is not None and stage not in PLUGIN_STAGES:
         raise HTTPException(status_code=422, detail=f"Unknown plugin stage '{stage}'.")
     return {"plugins": registry.list(stage)}

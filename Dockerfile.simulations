@@ -1,32 +1,41 @@
 FROM python:3.12-slim
 
+ARG BRIXTA_VERSION=2.1.0
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.title="BRIXTA CalculiX Worker" \
+      org.opencontainers.image.version="${BRIXTA_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}"
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     CALCULIX_EXECUTABLE=ccx \
-    SIMULATION_TIMEOUT_SECONDS=1800
-
+    SIMULATION_TIMEOUT_SECONDS=1800 \
+    BRIXTA_ENVIRONMENT=production
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends calculix-ccx \
+    && apt-get install -y --no-install-recommends calculix-ccx git \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements-api.txt .
-RUN pip install --upgrade pip && pip install -r requirements-api.txt
+COPY requirements-api.txt requirements-plugins.txt pyproject.toml README.md ./
+RUN python -m pip install --upgrade pip \
+    && python -m pip install -r requirements-api.txt -r requirements-plugins.txt
 
 COPY api/ ./api/
+COPY brixta_cli/ ./brixta_cli/
+COPY brixta_mcp/ ./brixta_mcp/
 COPY brixta_sdk/ ./brixta_sdk/
 COPY core/ ./core/
 COPY plugins/ ./plugins/
 COPY runtime/ ./runtime/
 
-RUN groupadd -r brixta \
-    && useradd -r -g brixta -d /app brixta \
+RUN python -m pip install --no-deps . \
+    && groupadd --system --gid 10001 brixta \
+    && useradd --system --uid 10001 --gid brixta --home-dir /app brixta \
     && mkdir -p /app/storage \
     && chown -R brixta:brixta /app
 
-USER brixta
-
-CMD ["python", "-m", "celery", "-A", "runtime.celery_app.celery", "worker", "--loglevel=info", "--queues=simulations.calculix", "--concurrency=1"]
+USER 10001:10001
+CMD ["python", "-m", "celery", "-A", "runtime.celery_app.celery", "worker", "--loglevel=info", "--queues=simulations.calculix", "--concurrency=1", "--hostname=calculix@%h"]

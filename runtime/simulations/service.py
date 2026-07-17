@@ -58,6 +58,9 @@ def _collect_evidence(
 
 
 def build_preflight(payload: SimulationPreflightRequest) -> dict[str, Any]:
+    tenant_id = (payload.tenant_id or "").strip()
+    if not tenant_id:
+        raise SimulationError("A tenant scope is required for simulation evidence.")
     card = get_case_card(payload.case_card_id)
     parameters = validate_case_parameters(payload.case_card_id, payload.parameters)
     query = payload.evidence_query or (
@@ -65,7 +68,7 @@ def build_preflight(payload: SimulationPreflightRequest) -> dict[str, Any]:
         f"{card['analysis_type']}"
     )
     evidence = _collect_evidence(
-        tenant_id=payload.tenant_id,
+        tenant_id=tenant_id,
         knowledge_base_ids=payload.knowledge_base_ids,
         query=query,
     )
@@ -100,9 +103,12 @@ def build_preflight(payload: SimulationPreflightRequest) -> dict[str, Any]:
 
 
 def create_simulation_run(payload: SimulationRunRequest) -> dict[str, Any]:
+    tenant_id = (payload.tenant_id or "").strip()
+    if not tenant_id:
+        raise SimulationError("A tenant scope is required for simulation runs.")
     preflight = build_preflight(
         SimulationPreflightRequest(
-            tenant_id=payload.tenant_id,
+            tenant_id=tenant_id,
             case_card_id=payload.case_card_id,
             parameters=payload.parameters,
             knowledge_base_ids=payload.knowledge_base_ids,
@@ -123,7 +129,7 @@ def create_simulation_run(payload: SimulationRunRequest) -> dict[str, Any]:
         "visualization": preflight["visualization"],
     }
     return SimulationRunRepository.create(
-        tenant_id=payload.tenant_id,
+        tenant_id=tenant_id,
         case_card_id=payload.case_card_id,
         solver=preflight["case_card"]["solver"],
         execution_mode=payload.execution_mode,

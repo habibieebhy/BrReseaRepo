@@ -1,19 +1,45 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: drizzle-migration
+  name: brixta-migration
+  namespace: brixta
 spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 3600
   template:
+    metadata:
+      labels:
+        app: brixta-migration
     spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
-      - name: migration
-        image: docker.io/goswamirohit/brresearepo:v5
-        workingDir: /app/infra
-        command: ["/bin/sh", "-c", "npm install && npx drizzle-kit push --config=drizzle.config.ts"]        
-        envFrom:
-        - secretRef:
-            name: app-secrets
-        env:
-        - name: npm_config_cache
-          value: "/tmp/.npm"
-      restartPolicy: OnFailure
+        - name: migration
+          image: ghcr.io/brixtaorg/brresearepo-core:2.1.0
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/infra
+          command: ["node", "migrate.mjs"]
+          envFrom:
+            - secretRef:
+                name: app-secrets
+          env:
+            - name: npm_config_cache
+              value: /tmp/.npm
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

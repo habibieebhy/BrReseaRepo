@@ -2,8 +2,13 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: brixta-scheduler
+  namespace: brixta
+  labels:
+    app: brixta-scheduler
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: brixta-scheduler
@@ -12,17 +17,50 @@ spec:
       labels:
         app: brixta-scheduler
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: celery-beat
-          image: docker.io/goswamirohit/brresearepo:v5
-          command: ["celery", "-A", "runtime.celery_app.celery", "beat", "--loglevel=info"]
+          image: ghcr.io/brixtaorg/brresearepo-core:2.1.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - -m
+            - celery
+            - -A
+            - runtime.celery_app.celery
+            - beat
+            - --loglevel=info
+            - --schedule=/app/storage/control-plane/celerybeat-schedule
           envFrom:
             - secretRef:
                 name: app-secrets
+          env:
+            - name: BRIXTA_ENVIRONMENT
+              value: production
+            - name: BRIXTA_CONTROL_PLANE_BACKEND
+              value: postgres
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           volumeMounts:
             - name: shared-storage
               mountPath: /app/storage
       volumes:
         - name: shared-storage
           persistentVolumeClaim:
-            claimName: storage-pvc
+            claimName: brixta-shared-pvc

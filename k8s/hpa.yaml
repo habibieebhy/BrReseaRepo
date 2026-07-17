@@ -2,13 +2,15 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: gateway-hpa
+  namespace: brixta
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: gateway
-  minReplicas: 2
-  maxReplicas: 10
+  # Enable only after source/settings persistence is moved from a shared file.
+  minReplicas: 1
+  maxReplicas: 3
   metrics:
   - type: Resource
     resource:

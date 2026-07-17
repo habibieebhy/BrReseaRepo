@@ -133,6 +133,22 @@ export const knowledgeAccess = brixtaSchema.table("knowledge_access", {
 ]);
 
 // -----------------------------------------------------------------------------
+// Scheduled crawl sources
+// PostgreSQL is the production control-plane backend. The JSON payload keeps
+// connector-specific configuration extensible while tenant/id stay indexed.
+// -----------------------------------------------------------------------------
+
+export const sources = brixtaSchema.table("sources", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: text("tenant_id").notNull(),
+  payload: jsonb("payload").default({}).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("sources_tenant_created_idx").on(table.tenantId, table.createdAt),
+]);
+
+// -----------------------------------------------------------------------------
 // Simulation runs
 // Evidence-aware Case Card executions for solver integrations such as CalculiX.
 // -----------------------------------------------------------------------------

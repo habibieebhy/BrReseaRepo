@@ -1,0 +1,7 @@
+# Production plugin distributions are pinned here and baked into every BRIXTA
+# image that needs them. Examples:
+# brixta-sharepoint-plugin==1.2.3
+# brixta-industry-simulation-pack @ git+https://github.com/example/pack.git@<commit>
+#
+# Do not `pip install` into a running pod. Add the pin, rebuild all affected
+# images, verify the plugin catalog, and deploy the immutable image digest.

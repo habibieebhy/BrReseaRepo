@@ -2,10 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: brixta-dashboard
-  namespace: default
+  namespace: brixta
   labels:
     app: brixta-dashboard
-    component: frontend
 spec:
   replicas: 1
   selector:
@@ -15,56 +14,62 @@ spec:
     metadata:
       labels:
         app: brixta-dashboard
-        component: frontend
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: dashboard
-          image: docker.io/goswamirohit/brresearepo-dashboard:v5
+          image: ghcr.io/brixtaorg/brresearepo-dashboard:2.1.0
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 3000
-              name: http
+            - name: http
+              containerPort: 3000
           env:
-            # Reaches out to the newly internalized gateway service
             - name: PYTHON_BACKEND_URL
-              value: "http://gateway-service"
+              value: http://gateway-service
+            - name: BRIXTA_DASHBOARD_AUTH_MODE
+              value: cloudflare-access
             - name: NEXT_TELEMETRY_DISABLED
               value: "1"
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "256Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 3000
-            initialDelaySeconds: 15
-            periodSeconds: 20
           readinessProbe:
             httpGet:
-              path: /
-              port: 3000
-            initialDelaySeconds: 10
+              path: /login
+              port: http
+            initialDelaySeconds: 5
             periodSeconds: 10
-
+          livenessProbe:
+            httpGet:
+              path: /login
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: brixta-dashboard-service
-  namespace: default
-  labels:
-    app: brixta-dashboard
-    component: frontend
+  namespace: brixta
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: brixta-dashboard
   ports:
     - name: http
       port: 80
-      targetPort: 3000
-      # Exposed securely over your Tailscale host
-      nodePort: 32080
+      targetPort: http

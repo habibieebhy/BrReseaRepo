@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from importlib import import_module
+from importlib.metadata import entry_points
 from threading import Lock
-from typing import Any
+from typing import Any, Iterable, Mapping
 
 
 SIMULATION_STAGES = ("compiler", "runner", "postprocessor")
@@ -58,6 +59,39 @@ class SimulationPluginRegistry:
             for stage in SIMULATION_STAGES
             for spec in self._specs[stage].values()
         ]
+
+
+def _simulation_spec(
+    value: SimulationPluginSpec | Mapping[str, Any],
+) -> SimulationPluginSpec:
+    if isinstance(value, SimulationPluginSpec):
+        return value
+    payload = dict(value)
+    payload["capabilities"] = tuple(payload.get("capabilities", ()))
+    return SimulationPluginSpec(**payload)
+
+
+def discover_simulation_plugins(target: SimulationPluginRegistry) -> None:
+    """Load immutable simulation-pack metadata from installed distributions."""
+
+    for entrypoint in entry_points(group="brixta.simulation_plugins"):
+        loaded = entrypoint.load()
+        supplied = (
+            loaded()
+            if callable(loaded) and not isinstance(loaded, SimulationPluginSpec)
+            else loaded
+        )
+        values: Iterable[SimulationPluginSpec | Mapping[str, Any]]
+        if isinstance(supplied, (SimulationPluginSpec, Mapping)):
+            values = (supplied,)
+        elif isinstance(supplied, Iterable) and not isinstance(supplied, (str, bytes)):
+            values = supplied
+        else:
+            raise ValueError(
+                f"Entry point '{entrypoint.name}' did not return simulation plugin metadata."
+            )
+        for value in values:
+            target.register(_simulation_spec(value))
 
 
 simulation_registry = SimulationPluginRegistry()
@@ -121,3 +155,4 @@ simulation_registry.register(
         ("engineering-summary", "markdown-report"),
     )
 )
+discover_simulation_plugins(simulation_registry)

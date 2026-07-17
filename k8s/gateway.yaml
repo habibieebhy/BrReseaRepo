@@ -2,8 +2,16 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gateway
+  namespace: brixta
+  labels:
+    app: gateway
+    app.kubernetes.io/part-of: brixta
 spec:
-  replicas: 2
+  # Settings still use the shared control-plane file. Keep one API replica
+  # until that final mutable repository moves to PostgreSQL.
+  replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: gateway
@@ -12,38 +20,75 @@ spec:
       labels:
         app: gateway
     spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
-      - name: gateway
-        image: docker.io/goswamirohit/brresearepo:v5
-        #command: ["sleep", "3600"]
-        command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"] # Internal container port can stay 8000 safely
-        resources:
-          requests:
-            cpu: "250m"
-            memory: "256Mi"
-          limits:
-            cpu: "500m"
-            memory: "512Mi"
-        envFrom:
-        - secretRef:
-            name: app-secrets
-        volumeMounts:
-        - name: shared-storage
-          mountPath: /app/storage
+        - name: gateway
+          image: ghcr.io/brixtaorg/brresearepo-core:2.1.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: app-secrets
+          env:
+            - name: BRIXTA_ENVIRONMENT
+              value: production
+            - name: BRIXTA_CONTROL_PLANE_BACKEND
+              value: postgres
+          ports:
+            - name: http
+              containerPort: 8000
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /app/storage
       volumes:
-      - name: shared-storage
-        persistentVolumeClaim:
-          claimName: storage-pvc
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: brixta-shared-pvc
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: gateway-service
+  namespace: brixta
 spec:
   type: ClusterIP
   selector:
     app: gateway
   ports:
-    - protocol: TCP
-      port: 80         # Internal cluster communication port
-      targetPort: 8000   # Directs to your FastAPI application container port
+    - name: http
+      port: 80
+      targetPort: http

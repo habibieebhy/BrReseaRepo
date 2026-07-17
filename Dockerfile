@@ -1,79 +1,64 @@
-# ==========================================
-# Stage 1: Base
-# ==========================================
-FROM python:3.12-slim AS base
+FROM python:3.12-slim AS builder
 
-# Set environment variables for Python
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+WORKDIR /build
 
-WORKDIR /app
-
-# ==========================================
-# Stage 2: Builder
-# ==========================================
-FROM base AS builder
-
-# Install system dependencies required for building Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    gcc \
+      build-essential gcc git \
     && rm -rf /var/lib/apt/lists/*
-
-# Create a virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install maintained dependency groups. requirements.txt is a historical freeze
-# and is intentionally excluded because its platform pins conflict with Docling.
-COPY requirements-api.txt .
-COPY requirements-workers.txt .
-COPY requirements-rag.txt .
-ARG CACHE_DATE=1
-RUN pip install --upgrade pip && \
-    pip install -r requirements-workers.txt -r requirements-rag.txt
+COPY requirements-api.txt requirements-workers.txt requirements-rag.txt requirements-plugins.txt ./
+RUN python -m pip install --upgrade pip \
+    && python -m pip install \
+      -r requirements-workers.txt \
+      -r requirements-rag.txt \
+      -r requirements-plugins.txt
 
-# ==========================================
-# Stage 3: Production Runner
-# ==========================================
-FROM base AS runner
+FROM python:3.12-slim AS runner
 
-# Install Node.js and npm for Drizzle ORM migrations
+ARG BRIXTA_VERSION=2.1.0
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.title="BRIXTA Core" \
+      org.opencontainers.image.version="${BRIXTA_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.source="https://github.com/BRIXTAOrg/BrReseaRepo"
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    BRIXTA_ENVIRONMENT=production
+WORKDIR /app
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    nodejs \
-    npm \
-    && rm -rf /var/lib/apt/lists/*
+      ca-certificates nodejs npm \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 brixta \
+    && useradd --system --uid 10001 --gid brixta --home-dir /app brixta
 
-# Create a non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
-# Copy the virtual environment from the builder stage
 COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Copy the application code AND the infra directory
+COPY pyproject.toml README.md ./
 COPY api/ ./api/
+COPY brixta_cli/ ./brixta_cli/
+COPY brixta_mcp/ ./brixta_mcp/
+COPY brixta_sdk/ ./brixta_sdk/
 COPY core/ ./core/
 COPY plugins/ ./plugins/
 COPY runtime/ ./runtime/
-COPY brixta_sdk/ ./brixta_sdk/
-COPY brixta_mcp/ ./brixta_mcp/
-COPY brixta_cli/ ./brixta_cli/
 COPY infra/ ./infra/
 
-# Install drizzle deps inside infra folder
-RUN cd infra && npm install
+RUN python -m pip install --no-deps . \
+    && cd infra && npm ci --omit=dev \
+    && mkdir -p /app/storage \
+    && chown -R brixta:brixta /app
 
-# Create empty storage directories with correct permissions
-COPY --chown=appuser:appuser storage/ ./storage/
+USER 10001:10001
+EXPOSE 8000 8001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
 
-# Set ownership to the non-root user
-RUN chown -R appuser:appuser /app
-
-# Switch to non-root user
-USER appuser
-
-# Default command
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]

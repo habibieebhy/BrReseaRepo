@@ -2,6 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: workers-light
+  namespace: brixta
+  labels:
+    app: workers-light
 spec:
   replicas: 1
   selector:
@@ -12,22 +15,54 @@ spec:
       labels:
         app: workers-light
     spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 300
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
-      - name: celery
-        image: docker.io/goswamirohit/brresearepo:v5
-        command: ["celery", "-A", "runtime.celery_app.celery", "worker", "--loglevel=info", "-Q", "downloader,parser,chunker"]
-        envFrom:
-        - secretRef:
-            name: app-secrets
-        env:
-        - name: CELERY_BROKER_URL
-          value: "redis://redis-service:6379/0"
-        - name: HF_HOME
-          value: "/tmp/huggingface"
-        volumeMounts:
-        - name: shared-storage
-          mountPath: /app/storage
+        - name: celery
+          image: ghcr.io/brixtaorg/brresearepo-core:2.1.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - -m
+            - celery
+            - -A
+            - runtime.celery_app.celery
+            - worker
+            - --loglevel=info
+            - --queues=downloader,parser,chunker
+            - --hostname=light@%h
+          envFrom:
+            - secretRef:
+                name: app-secrets
+          env:
+            - name: BRIXTA_ENVIRONMENT
+              value: production
+            - name: BRIXTA_CONTROL_PLANE_BACKEND
+              value: postgres
+            - name: HF_HOME
+              value: /tmp/huggingface
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /app/storage
       volumes:
-      - name: shared-storage
-        persistentVolumeClaim:
-          claimName: storage-pvc
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: brixta-shared-pvc

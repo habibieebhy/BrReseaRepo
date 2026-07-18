@@ -4,7 +4,7 @@ set -Eeuo pipefail
 
 NAMESPACE="${BRIXTA_NAMESPACE:-brixta}"
 SECRETS_MODE="${SECRETS_MODE:-infisical}"
-IMAGE_REGISTRY="${BRIXTA_IMAGE_REGISTRY:-ghcr.io/brixtaorg}"
+IMAGE_REGISTRY="${BRIXTA_IMAGE_REGISTRY:-docker.io/goswamirohit}"
 IMAGE_TAG="${BRIXTA_IMAGE_TAG:-2.1.0}"
 WAIT_TIMEOUT="${BRIXTA_DEPLOY_TIMEOUT:-600s}"
 
@@ -28,10 +28,10 @@ require_value() {
 
 render_manifest() {
   sed \
-    -e "s#ghcr.io/brixtaorg/brresearepo-core:[^[:space:]]*#${IMAGE_REGISTRY}/brresearepo-core:${IMAGE_TAG}#g" \
-    -e "s#ghcr.io/brixtaorg/brresearepo-dashboard:[^[:space:]]*#${IMAGE_REGISTRY}/brresearepo-dashboard:${IMAGE_TAG}#g" \
-    -e "s#ghcr.io/brixtaorg/brresearepo-openfoam:[^[:space:]]*#${IMAGE_REGISTRY}/brresearepo-openfoam:${IMAGE_TAG}#g" \
-    -e "s#ghcr.io/brixtaorg/brresearepo-simulations:[^[:space:]]*#${IMAGE_REGISTRY}/brresearepo-simulations:${IMAGE_TAG}#g" \
+    -e "s#docker.io/goswamirohit/brresearepo:[^[:space:]]*#${IMAGE_REGISTRY}/brresearepo:${IMAGE_TAG}#g" \
+    -e "s#docker.io/goswamirohit/brresearepo-dashboard:[^[:space:]]*#${IMAGE_REGISTRY}/brresearepo-dashboard:${IMAGE_TAG}#g" \
+    -e "s#docker.io/goswamirohit/brresearepo-openfoam:[^[:space:]]*#${IMAGE_REGISTRY}/brresearepo-openfoam:${IMAGE_TAG}#g" \
+    -e "s#docker.io/goswamirohit/brresearepo-simulations:[^[:space:]]*#${IMAGE_REGISTRY}/brresearepo-simulations:${IMAGE_TAG}#g" \
     "$1"
 }
 
@@ -161,7 +161,7 @@ kubectl -n "$NAMESPACE" delete job minio-init --ignore-not-found
 kubectl apply -f k8s/minio-init.yaml
 kubectl -n "$NAMESPACE" wait --for=condition=complete job/minio-init --timeout="$WAIT_TIMEOUT"
 
-log "Running database migrations with ${IMAGE_REGISTRY}/brresearepo-core:${IMAGE_TAG}"
+log "Running database migrations with ${IMAGE_REGISTRY}/brresearepo:${IMAGE_TAG}"
 kubectl -n "$NAMESPACE" delete job brixta-migration --ignore-not-found
 apply_manifest k8s/drizzle-job.yaml
 kubectl -n "$NAMESPACE" wait --for=condition=complete job/brixta-migration --timeout="$WAIT_TIMEOUT"

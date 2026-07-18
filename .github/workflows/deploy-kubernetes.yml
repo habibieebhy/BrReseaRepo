@@ -40,7 +40,7 @@ jobs:
       - name: Deploy immutable images
         env:
           SECRETS_MODE: infisical
-          BRIXTA_IMAGE_REGISTRY: ghcr.io/brixtaorg
+          BRIXTA_IMAGE_REGISTRY: docker.io/goswamirohit
           BRIXTA_IMAGE_TAG: ${{ inputs.image_tag }}
           INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
           INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}

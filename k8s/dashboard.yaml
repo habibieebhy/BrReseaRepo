@@ -24,7 +24,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: dashboard
-          image: ghcr.io/brixtaorg/brresearepo-dashboard:2.1.0
+          image: docker.io/goswamirohit/brresearepo-dashboard:2.1.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -96,10 +96,12 @@ metadata:
   name: brixta-dashboard-service
   namespace: brixta
 spec:
-  type: ClusterIP
+  # The host-managed Cloudflare Tunnel connects to this NodePort.
+  type: NodePort
   selector:
     app: brixta-dashboard
   ports:
     - name: http
       port: 80
       targetPort: http
+      nodePort: 30020

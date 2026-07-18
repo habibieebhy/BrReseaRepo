@@ -27,7 +27,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: celery-beat
-          image: ghcr.io/brixtaorg/brresearepo-core:2.1.0
+          image: docker.io/goswamirohit/brresearepo:2.1.0
           imagePullPolicy: IfNotPresent
           command:
             - python

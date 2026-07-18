@@ -13,14 +13,22 @@ ENV DEBIAN_FRONTEND=noninteractive \
     SIMULATION_TIMEOUT_SECONDS=3600 \
     BRIXTA_ENVIRONMENT=production
 
-RUN apt-get update \
+RUN apt-get -o Acquire::Retries=5 update \
     && apt-get install -y --no-install-recommends \
-      ca-certificates git python3 python3-venv software-properties-common wget \
+      ca-certificates git python3 python3-venv wget \
     && wget -qO /etc/apt/trusted.gpg.d/openfoam.asc https://dl.openfoam.org/gpg.key \
-    && add-apt-repository "https://dl.openfoam.org/ubuntu main" \
-    && apt-get update \
+    && printf '%s\n' \
+      'deb http://dl.openfoam.org/ubuntu noble main' \
+      > /etc/apt/sources.list.d/openfoam.list \
+    && apt-get -o Acquire::Retries=5 update \
     && apt-get install -y --no-install-recommends openfoam13 \
     && rm -rf /var/lib/apt/lists/*
+
+RUN bash -lc '. /opt/openfoam13/etc/bashrc \
+    && command -v blockMesh \
+    && command -v checkMesh \
+    && command -v foamRun \
+    && command -v foamToVTK'
 
 WORKDIR /app
 RUN python3 -m venv /opt/brixta-venv

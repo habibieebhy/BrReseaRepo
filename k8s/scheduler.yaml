@@ -30,14 +30,16 @@ spec:
           image: docker.io/goswamirohit/brresearepo:2.1.0
           imagePullPolicy: IfNotPresent
           command:
-            - python
-            - -m
-            - celery
-            - -A
-            - runtime.celery_app.celery
-            - beat
-            - --loglevel=info
-            - --schedule=/app/storage/control-plane/celerybeat-schedule
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              mkdir -p /app/storage/control-plane
+              exec python -m celery \
+                -A runtime.celery_app.celery \
+                beat \
+                --loglevel=info \
+                --schedule=/app/storage/control-plane/celerybeat-schedule
           envFrom:
             - secretRef:
                 name: app-secrets

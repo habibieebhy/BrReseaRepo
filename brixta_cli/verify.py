@@ -98,7 +98,7 @@ def _list_tools(
             "params": {
                 "protocolVersion": "2025-03-26",
                 "capabilities": {},
-                "clientInfo": {"name": "brixta-cli", "version": "2.0.0"},
+                "clientInfo": {"name": "brixta-cli", "version": "2.1.1"},
             },
         },
     )

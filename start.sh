@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
+# Load server deployment settings so ./start.sh is the complete command.
+DEPLOY_ENV_FILE="${BRIXTA_DEPLOY_ENV_FILE:-.env}"
+
+if [[ -f "$DEPLOY_ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$DEPLOY_ENV_FILE"
+  set +a
+fi
 
 NAMESPACE="${BRIXTA_NAMESPACE:-brixta}"
 SECRETS_MODE="${SECRETS_MODE:-infisical}"
 IMAGE_REGISTRY="${BRIXTA_IMAGE_REGISTRY:-docker.io/goswamirohit}"
-IMAGE_TAG="${BRIXTA_IMAGE_TAG:-2.1.0}"
+IMAGE_TAG="${BRIXTA_IMAGE_TAG:-2.1.1}"
 WAIT_TIMEOUT="${BRIXTA_DEPLOY_TIMEOUT:-600s}"
 
 log() {

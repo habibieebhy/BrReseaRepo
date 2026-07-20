@@ -24,7 +24,8 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     try {
       const { token } = await auth0.getAccessToken();
       headers.set("authorization", `Bearer ${token}`);
-    } catch {
+    } catch (error) {
+      console.error("[Auth0 Proxy Error] Failed to get access token:", error);
       return Response.json({ detail: "Your BRIXTA session has expired." }, { status: 401 });
     }
   }

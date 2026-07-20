@@ -12,7 +12,8 @@ async function authorizationHeaders(): Promise<HeadersInit> {
     try {
       const { token } = await auth0.getAccessToken();
       return { Authorization: `Bearer ${token}` };
-    } catch {
+    } catch (error) {
+      console.error("[Server API] Failed to get Auth0 Access Token:", error);
       return {};
     }
   }

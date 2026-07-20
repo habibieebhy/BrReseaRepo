@@ -55,7 +55,7 @@ export const auth0 = auth0Enabled
         audience: process.env.AUTH0_AUDIENCE,
         // Add BRIXTA API scopes through AUTH0_SCOPE only after those
         // permissions exist on the Auth0 Custom API.
-        scope: process.env.AUTH0_SCOPE || "openid profile email",
+        scope: process.env.AUTH0_SCOPE || "openid profile email offline_access",
       },
       signInReturnToPath: "/dashboard",
       enableAccessTokenEndpoint: false,

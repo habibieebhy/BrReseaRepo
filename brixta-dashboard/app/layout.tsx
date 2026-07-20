@@ -10,6 +10,9 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 export const metadata: Metadata = {
   title: "BRIXTA Dashboard",
   description: "High-performance vectorization pipeline.",
+  icons: {
+    icon: "/brixta.ico",
+  }
 };
 
 export default function RootLayout({
